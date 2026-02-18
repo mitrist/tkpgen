@@ -18,6 +18,7 @@
         * { box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 2rem; line-height: 1.5; }
         .container { max-width: 560px; margin: 0 auto; }
+        .container--wide { max-width: 960px; }
         .card { background: var(--card); border-radius: 12px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         h1 { font-size: 1.5rem; margin: 0 0 1.5rem; color: var(--text); }
         label { display: block; font-weight: 500; margin-bottom: 0.25rem; color: var(--text); }
@@ -37,7 +38,7 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container {% block container_extra_class %}{% endblock %}">
         <div class="card">
             {% if messages %}
             <ul class="errorlist">

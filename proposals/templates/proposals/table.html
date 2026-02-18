@@ -1,7 +1,9 @@
 {% extends "proposals/base.html" %}
 {% load proposal_filters %}
 {% block title %}Перечень ТКП{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
 {% block content %}
+<div style="overflow-x: auto;">
 <h1>Перечень сформированных ТКП</h1>
 <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
     <thead>
@@ -34,4 +36,5 @@
 <p style="margin-top: 1.5rem;">
     <a href="{% url 'proposals:form' %}" class="btn">К форме ввода</a>
 </p>
+</div>
 {% endblock %}

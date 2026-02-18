@@ -1,9 +1,10 @@
+import json
 import re
+import subprocess
 import tempfile
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-import subprocess
 
 from django.conf import settings
 from django.http import FileResponse
@@ -13,7 +14,7 @@ from django.views.decorators.http import require_http_methods
 from docxtpl import DocxTemplate
 
 from .forms import ProposalForm
-from .models import Service, TKPRecord
+from .models import RegionServicePrice, Service, TKPRecord
 
 
 def _sanitize_filename(name):
@@ -55,25 +56,52 @@ def form_view(request):
         if form.is_valid():
             data = form.cleaned_data
             service = data['service']
-            s = data['s']
-            price_calc = service.unit * s  # цена = единица_измерения × площадь
+            s = data.get('s') or 0
+            if data.get('is_internal'):
+                price_value = data.get('internal_price') or 0
+                region_name = ''
+            else:
+                region = data['region']
+                try:
+                    rsp = RegionServicePrice.objects.get(region=region, service=service)
+                    price_value = rsp.unit_price * s
+                except RegionServicePrice.DoesNotExist:
+                    messages.error(
+                        request,
+                        f'Не найдена цена для региона "{region.name}" и услуги "{service.name}". '
+                        'Загрузите справочник: python manage.py load_region_prices',
+                    )
+                    return render(request, 'proposals/form.html', {
+                        'form': form,
+                        'service_units_json': json.dumps({str(s.pk): s.unit_type for s in Service.objects.all()}),
+                    })
+                region_name = region.name
+            client_value = (
+                (data['internal_client'] or '').strip()
+                if data.get('is_internal')
+                else (data['client'] or '')
+            )
             request.session['proposal_data'] = {
                 'date': data['date'].strftime('%Y-%m-%d'),
                 'service_id': service.pk,
                 'service_name': service.name,
-                'city': data['city'],
-                'price': str(price_calc),
-                'client': data['client'] or '',
+                'city': region_name,
+                'price': str(price_value),
+                'client': client_value,
                 'room': data['room'] or '',
                 'srok': data['srok'] or '',
                 'text': data['text'] or '',
-                's': str(s),
+                's': '' if data.get('is_internal') else str(s),
             }
             return redirect('proposals:confirm')
     else:
         form = ProposalForm()
 
-    return render(request, 'proposals/form.html', {'form': form})
+    service_units = {str(s.pk): s.unit_type for s in Service.objects.all()}
+    return render(request, 'proposals/form.html', {
+        'form': form,
+        'service_units_json': json.dumps(service_units),
+    })
 
 
 @require_http_methods(['GET', 'POST'])
@@ -173,12 +201,11 @@ def _generate_pdf(data):
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d')
     date_display = date_obj.strftime('%d.%m.%Y')
 
-    s_val = Decimal(data['s']) if data.get('s') else Decimal('0')
-    price_calc = service.unit * s_val  # цена = единица_измерения × площадь
+    price_val = Decimal(data['price'])
 
     context = {
-        'city': data['city'],
-        'price': _format_price(price_calc),
+        'city': data.get('city', ''),
+        'price': _format_price(price_val),
         'date': date_display,
         'client': data['client'] or '',
         'room': data.get('room') or '',

@@ -7,11 +7,11 @@ from proposals.models import Service
 
 
 SERVICES = [
-    (1, 'ДП', 'Шаблон 1 ДП.docx', 1),
-    (2, 'ДКП', 'Шаблон 2 ДКП.docx', 1),
-    (3, 'Навигация', 'Шаблон 3 Навигация.docx', 10),
-    (4, 'Контент', 'Шаблон 4 Контент.docx', 10),
-    (5, 'Навигация_стенды', 'Шаблон 5 Навигация_стенды.docx', 10),
+    (1, 'ДП', 'Шаблон 1 ДП.docx', Service.UNIT_M2),
+    (2, 'ДКП', 'Шаблон 2 ДКП.docx', Service.UNIT_M2),
+    (3, 'Навигация', 'Шаблон 3 Навигация.docx', Service.UNIT_PIECE),
+    (4, 'Контент', 'Шаблон 4 Контент.docx', Service.UNIT_PIECE),
+    (5, 'Навигация_стенды', 'Шаблон 5 Навигация_стенды.docx', Service.UNIT_M2),
 ]
 
 
@@ -30,10 +30,10 @@ class Command(BaseCommand):
             Service.objects.all().delete()
             self.stdout.write('Существующие услуги удалены.')
 
-        for order, name, template_file, unit in SERVICES:
+        for order, name, template_file, unit_type in SERVICES:
             obj, created = Service.objects.update_or_create(
                 template_file=template_file,
-                defaults={'name': name, 'order': order, 'unit': unit}
+                defaults={'name': name, 'order': order, 'unit_type': unit_type}
             )
             status = 'создана' if created else 'обновлена'
             self.stdout.write(f'Услуга "{name}" ({template_file}) — {status}.')

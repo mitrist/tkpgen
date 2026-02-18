@@ -9,4 +9,42 @@
     {{ form.as_p }}
     <button type="submit">Сформировать ТКП</button>
 </form>
+<script>
+(function() {
+    var serviceUnits = {{ service_units_json|safe }};
+    var checkbox = document.getElementById('id_is_internal');
+    var serviceSelect = document.getElementById('id_service');
+    var internalRow = document.getElementById('id_internal_client')?.closest('p');
+    var internalPriceRow = document.getElementById('id_internal_price')?.closest('p');
+    var clientRow = document.getElementById('id_client')?.closest('p');
+    var regionRow = document.getElementById('id_region')?.closest('p');
+    var sRow = document.getElementById('id_s')?.closest('p');
+    var sLabel = sRow?.querySelector('label');
+
+    function updateSLabel() {
+        if (!sLabel || !serviceSelect) return;
+        var sid = serviceSelect.value;
+        var unitType = serviceUnits[sid];
+        sLabel.textContent = unitType === 'piece' ? 'Количество (шт)' : 'Площадь (м²)';
+    }
+
+    function toggle() {
+        var checked = checkbox.checked;
+        if (internalRow) internalRow.style.display = checked ? '' : 'none';
+        if (internalPriceRow) internalPriceRow.style.display = checked ? '' : 'none';
+        if (clientRow) clientRow.style.display = checked ? 'none' : '';
+        if (regionRow) regionRow.style.display = checked ? 'none' : '';
+        if (sRow) sRow.style.display = checked ? 'none' : '';
+    }
+
+    if (checkbox) {
+        checkbox.addEventListener('change', toggle);
+        toggle();
+    }
+    if (serviceSelect) {
+        serviceSelect.addEventListener('change', updateSLabel);
+        updateSLabel();
+    }
+})();
+</script>
 {% endblock %}

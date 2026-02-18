@@ -7,9 +7,9 @@
     <dd>{{ date }}</dd>
     <dt>Услуга</dt>
     <dd>{{ service_name }}</dd>
-    <dt>Город</dt>
-    <dd>{{ city }}</dd>
-    <dt>Стоимость (единица × площадь)</dt>
+    <dt>Регион</dt>
+    <dd>{{ city|default:"—" }}</dd>
+    <dt>Стоимость</dt>
     <dd>{{ price }} ₽</dd>
     {% if client %}
     <dt>Клиент</dt>
@@ -28,7 +28,7 @@
     <dd>{{ text|linebreaksbr }}</dd>
     {% endif %}
     {% if s %}
-    <dt>Общая площадь</dt>
+    <dt>Площадь / Количество</dt>
     <dd>{{ s }}</dd>
     {% endif %}
 </dl>
