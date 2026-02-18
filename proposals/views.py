@@ -3,6 +3,7 @@ import tempfile
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+import subprocess
 
 from django.conf import settings
 from django.http import FileResponse
@@ -10,7 +11,6 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 from docxtpl import DocxTemplate
-from docx2pdf import convert as docx2pdf_convert
 
 from .forms import ProposalForm
 from .models import Service, TKPRecord
@@ -196,7 +196,11 @@ def _generate_pdf(data):
         doc.render(context)
         doc.save(str(docx_path))
 
-        docx2pdf_convert(str(docx_path), str(pdf_path))
+        subprocess.run(
+            ['libreoffice', '--headless', '--convert-to', 'pdf',
+             '--outdir', str(pdf_path.parent), str(docx_path)],
+            check=True
+        )
 
         date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
         date_str = date_obj.strftime('%d%m%Y')  # 18022026

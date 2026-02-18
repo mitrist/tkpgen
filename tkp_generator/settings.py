@@ -6,11 +6,15 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-tkp-gen-dev-key-change-in-production'
 
-DEBUG = True
+def _env(key, default=None):
+    """Значение из переменных окружения."""
+    return os.environ.get(key, default)
 
-ALLOWED_HOSTS = ['*']
+
+SECRET_KEY = _env('SECRET_KEY', 'django-insecure-tkp-gen-dev-key-change-in-production')
+DEBUG = _env('DEBUG', 'True').lower() in ('true', '1', 'yes')
+ALLOWED_HOSTS = _env('ALLOWED_HOSTS', '*').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -72,6 +76,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [] if not (BASE_DIR / 'static').exists() else [BASE_DIR / 'static']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

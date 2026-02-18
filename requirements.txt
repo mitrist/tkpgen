@@ -1,4 +1,4 @@
 Django>=5.0
 docxtpl>=0.16.0
-docx2pdf>=0.1.8
+gunicorn>=21.0
 
