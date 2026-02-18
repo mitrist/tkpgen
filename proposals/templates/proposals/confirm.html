@@ -1,0 +1,34 @@
+{% extends "proposals/base.html" %}
+{% block title %}Подтверждение ТКП{% endblock %}
+{% block content %}
+<h1>Проверьте данные ТКП</h1>
+<dl class="summary">
+    <dt>Дата</dt>
+    <dd>{{ date }}</dd>
+    <dt>Услуга</dt>
+    <dd>{{ service_name }}</dd>
+    <dt>Город</dt>
+    <dd>{{ city }}</dd>
+    <dt>Стоимость (единица × площадь)</dt>
+    <dd>{{ price }} ₽</dd>
+    {% if client %}
+    <dt>Клиент</dt>
+    <dd>{{ client }}</dd>
+    {% endif %}
+    {% if text %}
+    <dt>Текст</dt>
+    <dd>{{ text|linebreaksbr }}</dd>
+    {% endif %}
+    {% if s %}
+    <dt>Общая площадь</dt>
+    <dd>{{ s }}</dd>
+    {% endif %}
+</dl>
+<form method="post">
+    {% csrf_token %}
+    <div class="actions">
+        <button type="submit">Подтвердить и скачать PDF</button>
+        <a href="{% url 'proposals:form' %}" class="btn btn-secondary">Вернуться к форме</a>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "proposals/base.html" %}
+{% load proposal_filters %}
+{% block title %}Перечень ТКП{% endblock %}
+{% block content %}
+<h1>Перечень сформированных ТКП</h1>
+<table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+    <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.5rem;">Дата</th>
+            <th style="text-align: left; padding: 0.5rem;">Номер ТКП</th>
+            <th style="text-align: left; padding: 0.5rem;">Клиент</th>
+            <th style="text-align: left; padding: 0.5rem;">Услуга</th>
+            <th style="text-align: right; padding: 0.5rem;">Сумма</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in records %}
+        <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
+            <td style="padding: 0.5rem;">{{ r.number }}</td>
+            <td style="padding: 0.5rem;">{{ r.client|default:"—" }}</td>
+            <td style="padding: 0.5rem;">{{ r.service }}</td>
+            <td style="padding: 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" style="padding: 1rem; color: var(--text-muted);">Нет сформированных ТКП</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p style="margin-top: 1.5rem;">
+    <a href="{% url 'proposals:form' %}" class="btn">К форме ввода</a>
+</p>
+{% endblock %}

@@ -1,0 +1,4 @@
+Django>=5.0
+docxtpl>=0.16.0
+gunicorn>=21.0
+
