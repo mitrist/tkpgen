@@ -1,5 +1,6 @@
+import re
 import tempfile
-import subprocess
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -13,6 +14,22 @@ from docx2pdf import convert as docx2pdf_convert
 
 from .forms import ProposalForm
 from .models import Service, TKPRecord
+
+
+def _sanitize_filename(name):
+    """Очистка строки для использования в имени файла."""
+    if not name or not name.strip():
+        return 'client'
+    s = name.strip()
+    s = re.sub(r'[\s]+', '_', s)
+    s = re.sub(r'[\\/:*?"<>|]', '', s)
+    return s[:100] if s else 'client'
+
+
+def _get_next_seq_for_date(date_obj):
+    """Порядковый номер ТКП на указанную дату."""
+    count = TKPRecord.objects.filter(date=date_obj).count()
+    return count + 1
 
 
 def _format_price(value):
@@ -47,6 +64,8 @@ def form_view(request):
                 'city': data['city'],
                 'price': str(price_calc),
                 'client': data['client'] or '',
+                'room': data['room'] or '',
+                'srok': data['srok'] or '',
                 'text': data['text'] or '',
                 's': str(s),
             }
@@ -75,7 +94,7 @@ def confirm_view(request):
             response = FileResponse(
                 open(pdf_path, 'rb'),
                 as_attachment=True,
-                filename=Path(pdf_path).name
+                filename=Path(pdf_path).name,
             )
             try:
                 pdf_path.unlink(missing_ok=True)
@@ -99,6 +118,8 @@ def confirm_view(request):
         'price': price_display,
         'price_raw': data['price'],
         'client': data['client'],
+        'room': data.get('room', ''),
+        'srok': data.get('srok', ''),
         'text': data['text'],
         's': data['s'],
     }
@@ -113,27 +134,22 @@ def table_view(request):
     return render(request, 'proposals/table.html', context)
 
 
-def _generate_tkp_number():
-    """Генерация номера ТКП: ТКП-ГГГГ-00001."""
-    from datetime import date
-    year = date.today().year
-    last = TKPRecord.objects.filter(number__startswith=f'ТКП-{year}-').order_by('-number').first()
-    if last:
-        try:
-            seq = int(last.number.split('-')[-1]) + 1
-        except (IndexError, ValueError):
-            seq = 1
-    else:
-        seq = 1
-    return f'ТКП-{year}-{seq:05d}'
+def _generate_doc_number(client, date_obj, seq):
+    """Генерация номера документа: client_DDMMYYYY_N."""
+    client_safe = _sanitize_filename(client or '')
+    date_str = date_obj.strftime('%d%m%Y')
+    return f'{client_safe}_{date_str}_{seq}'
 
 
 def _save_tkp_record(data):
     """Сохранение записи о сформированном ТКП."""
     from datetime import datetime
+    date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
+    seq = _get_next_seq_for_date(date_obj)
+    number = _generate_doc_number(data.get('client') or '', date_obj, seq)
     TKPRecord.objects.create(
-        date=datetime.strptime(data['date'], '%Y-%m-%d').date(),
-        number=_generate_tkp_number(),
+        date=date_obj,
+        number=number,
         client=data.get('client') or '',
         service=data['service_name'],
         sum_total=Decimal(data['price']),
@@ -165,6 +181,8 @@ def _generate_pdf(data):
         'price': _format_price(price_calc),
         'date': date_display,
         'client': data['client'] or '',
+        'room': data.get('room') or '',
+        'srok': data.get('srok') or '',
         'text': data['text'] or '',
         's': data.get('s') or '',
     }
@@ -178,10 +196,15 @@ def _generate_pdf(data):
         doc.render(context)
         doc.save(str(docx_path))
 
-        subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', 
-                '--outdir', str(pdf_path.parent), str(docx_path)], check=True)
+        docx2pdf_convert(str(docx_path), str(pdf_path))
 
-        result_path = Path(tempfile.gettempdir()) / f'TKP_{data["service_name"]}_{data["city"]}_{data["date"]}.pdf'
+        date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
+        date_str = date_obj.strftime('%d%m%Y')  # 18022026
+        seq = _get_next_seq_for_date(date_obj)
+        client_safe = _sanitize_filename(data.get('client') or '')
+
+        pdf_filename = f'{client_safe}_{date_str}_{seq}.pdf'
+        result_path = Path(tempfile.gettempdir()) / pdf_filename
         import shutil
         shutil.copy2(pdf_path, result_path)
         return result_path

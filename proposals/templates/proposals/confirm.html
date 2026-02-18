@@ -15,6 +15,14 @@
     <dt>Клиент</dt>
     <dd>{{ client }}</dd>
     {% endif %}
+    {% if room %}
+    <dt>Наименование объекта и характеристика помещений</dt>
+    <dd>{{ room }}</dd>
+    {% endif %}
+    {% if srok %}
+    <dt>Срок разработки</dt>
+    <dd>{{ srok }}</dd>
+    {% endif %}
     {% if text %}
     <dt>Текст</dt>
     <dd>{{ text|linebreaksbr }}</dd>

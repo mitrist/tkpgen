@@ -20,6 +20,22 @@ class ProposalForm(forms.Form):
         max_length=255,
         required=False
     )
+    room = forms.CharField(
+        label='Наименование объекта и характеристика помещений',
+        max_length=500,
+        required=False
+    )
+    srok = forms.ChoiceField(
+        label='Срок разработки',
+        choices=[
+            ('', 'Выберите срок'),
+            ('в течение 10 рабочих дней', 'в течение 10 рабочих дней'),
+            ('в течение 15 рабочих дней', 'в течение 15 рабочих дней'),
+            ('в течение 20 рабочих дней', 'в течение 20 рабочих дней'),
+            ('в течение 35 рабочих дней', 'в течение 35 рабочих дней'),
+        ],
+        required=False
+    )
     text = forms.CharField(
         label='Произвольный текст',
         widget=forms.Textarea(attrs={'rows': 4}),

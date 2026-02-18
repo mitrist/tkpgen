@@ -30,7 +30,7 @@ class Service(models.Model):
 class TKPRecord(models.Model):
     """Запись о сформированном ТКП."""
     date = models.DateField('Дата')
-    number = models.CharField('Номер ТКП', max_length=50, unique=True)
+    number = models.CharField('Номер документа', max_length=150, unique=True)
     client = models.CharField('Клиент', max_length=255, blank=True)
     service = models.CharField('Услуга', max_length=255)
     sum_total = models.DecimalField('Сумма', max_digits=15, decimal_places=2, default=0)
