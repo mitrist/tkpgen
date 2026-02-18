@@ -2,45 +2,18 @@
 
 ## Важно: Linux vs Windows
 
-На Ubuntu **нет MS Word**, поэтому `docx2pdf` не работает. Используется **LibreOffice** для конвертации docx → PDF.
+На Ubuntu **нет MS Word**, поэтому используется **LibreOffice** для конвертации docx → PDF. Проект подготовлен для деплоя: `requirements.txt` содержит gunicorn, docx2pdf убран.
+
+Для локальной разработки на Windows: `pip install docx2pdf` и замените в `views.py` subprocess LibreOffice на `docx2pdf_convert`.
 
 ---
 
-## 1. Подготовка проекта (на локальном ПК)
-
-Перед деплоем нужно заменить docx2pdf на LibreOffice:
-
-**proposals/views.py** — заменить строку:
-```python
-docx2pdf_convert(str(docx_path), str(pdf_path))
-```
-на:
-```python
-import subprocess
-subprocess.run(
-    ['libreoffice', '--headless', '--convert-to', 'pdf',
-     '--outdir', str(pdf_path.parent), str(docx_path)],
-    check=True
-)
-```
-
-Добавить `import subprocess` в начало файла, удалить `from docx2pdf import ...`.
-
-**requirements.txt** — убрать `docx2pdf`, добавить `gunicorn`:
-```
-Django>=5.0
-docxtpl>=0.16.0
-gunicorn>=21.0
-```
-
----
-
-## 2. Создание VM в Yandex Cloud
+## 1. Создание VM в Yandex Cloud
 
 1. Откройте [консоль Yandex Cloud](https://console.cloud.yandex.ru/).
 2. **Compute Cloud** → **Виртуальные машины** → **Создать ВМ**.
 3. Параметры:
-   - **Имя**: tkp-generator
+   - **Имя**: tkp
    - **Зона**: ближайшая (ru-central1-a)
    - **Платформа**: Intel Ice Lake
    - **Ядра**: 2
@@ -59,17 +32,15 @@ gunicorn>=21.0
 
 ---
 
-## 3. Подключение к VM
+## 2. Подключение к VM
 
 ```bash
-ssh ubuntu@ВНЕШНИЙ_IP_ВМ
+ssh mitrist12@93.77.182.91
 ```
-
-(или `ubuntu@` заменить на ваше имя пользователя)
 
 ---
 
-## 4. Установка зависимостей на VM
+## 3. Установка зависимостей на VM
 
 ```bash
 # Обновление системы
@@ -87,14 +58,13 @@ sudo apt install -y nginx
 
 ---
 
-## 5. Клонирование и настройка проекта
+## 4. Клонирование и настройка проекта
 
 ```bash
 # Клонирование
-cd /opt
-sudo git clone https://github.com/mitrist/tkpgen.git tkp_generator
-sudo chown -R $USER:$USER /opt/tkp_generator
-cd /opt/tkp_generator
+cd /home/mitrist12
+git clone https://github.com/mitrist/tkpgen.git tkp_generator
+cd /home/mitrist12/tkp_generator
 
 # Виртуальное окружение
 python3 -m venv venv
@@ -110,25 +80,29 @@ python manage.py migrate
 # Инициализация услуг
 python manage.py init_services --clear
 
+# Загрузка справочника цен по регионам
+python manage.py load_region_prices
+
 # Суперпользователь (для админки)
 python manage.py createsuperuser
 ```
 
 ---
 
-## 6. Конфигурация для production
+## 5. Конфигурация для production
 
-Создайте файл переменных окружения:
+Создайте файл переменных окружения (скопируйте пример и отредактируйте):
 
 ```bash
-nano /opt/tkp_generator/.env
+cp /home/mitrist12/tkp_generator/.env.example /home/mitrist12/tkp_generator/.env
+nano /home/mitrist12/tkp_generator/.env
 ```
 
-Содержимое:
+Содержимое `.env`:
 ```
 SECRET_KEY=сгенерируйте-длинную-случайную-строку
 DEBUG=False
-ALLOWED_HOSTS=IP_ВМ,localhost,127.0.0.1
+ALLOWED_HOSTS=93.77.182.91,localhost,127.0.0.1
 ```
 
 Для `SECRET_KEY` сгенерируйте строку:
@@ -136,25 +110,11 @@ ALLOWED_HOSTS=IP_ВМ,localhost,127.0.0.1
 python3 -c "import secrets; print(secrets.token_urlsafe(50))"
 ```
 
-В **tkp_generator/settings.py** добавьте в начало (после импортов):
-```python
-import os
-from pathlib import Path
-
-# Загрузка .env (упрощённо, без python-dotenv)
-def _env(key, default=None):
-    return os.environ.get(key, default)
-
-SECRET_KEY = _env('SECRET_KEY', 'change-me-in-production')
-DEBUG = _env('DEBUG', 'False').lower() == 'true'
-ALLOWED_HOSTS = _env('ALLOWED_HOSTS', 'localhost').split(',')
-```
-
-(Либо установите `pip install python-dotenv` и используйте `load_dotenv()`.)
+Settings уже читают переменные из окружения. Убедитесь, что `EnvironmentFile` в systemd указывает на `.env`.
 
 ---
 
-## 7. systemd-сервис (Gunicorn)
+## 6. systemd-сервис (Gunicorn)
 
 Создайте `/etc/systemd/system/tkp_generator.service`:
 
@@ -162,7 +122,7 @@ ALLOWED_HOSTS = _env('ALLOWED_HOSTS', 'localhost').split(',')
 sudo nano /etc/systemd/system/tkp_generator.service
 ```
 
-Содержимое (подставьте свой путь и IP):
+Содержимое:
 
 ```ini
 [Unit]
@@ -170,14 +130,14 @@ Description=TKP Generator Gunicorn
 After=network.target
 
 [Service]
-User=www-data
-Group=www-data
-WorkingDirectory=/opt/tkp_generator
+User=mitrist12
+Group=mitrist12
+WorkingDirectory=/home/mitrist12/tkp_generator
 
 # Переменные окружения
-EnvironmentFile=/opt/tkp_generator/.env
+EnvironmentFile=/home/mitrist12/tkp_generator/.env
 
-ExecStart=/opt/tkp_generator/venv/bin/gunicorn \
+ExecStart=/home/mitrist12/tkp_generator/venv/bin/gunicorn \
     --bind 127.0.0.1:8000 \
     --workers 2 \
     tkp_generator.wsgi:application
@@ -190,8 +150,7 @@ WantedBy=multi-user.target
 
 Настройка прав:
 ```bash
-sudo chown -R www-data:www-data /opt/tkp_generator
-sudo chmod 600 /opt/tkp_generator/.env
+sudo chmod 600 /home/mitrist12/tkp_generator/.env
 sudo systemctl daemon-reload
 sudo systemctl enable tkp_generator
 sudo systemctl start tkp_generator
@@ -199,7 +158,7 @@ sudo systemctl start tkp_generator
 
 ---
 
-## 8. Nginx
+## 7. Nginx
 
 Создайте `/etc/nginx/sites-available/tkp`:
 
@@ -213,7 +172,7 @@ server {
     server_name _;
 
     location /static/ {
-        alias /opt/tkp_generator/staticfiles/;
+        alias /home/mitrist12/tkp_generator/staticfiles/;
     }
 
     location / {
@@ -235,9 +194,9 @@ sudo systemctl reload nginx
 
 ---
 
-## 9. Шаблоны .docx
+## 8. Шаблоны .docx и справочник регионов
 
-Убедитесь, что в `/opt/tkp_generator/templates_docx/` лежат файлы:
+Убедитесь, что в `/home/mitrist12/tkp_generator/templates_docx/` лежат файлы:
 - Шаблон 1 ДП.docx
 - Шаблон 2 ДКП.docx
 - Шаблон 3 Навигация.docx
@@ -246,26 +205,61 @@ sudo systemctl reload nginx
 
 Имена должны совпадать с настройками в БД (см. `init_services`).
 
----
-
-## 10. Проверка
-
-Откройте в браузере: `http://ВНЕШНИЙ_IP_ВМ/`
-
-Админка: `http://ВНЕШНИЙ_IP_ВМ/admin/`
+В корне проекта должен быть `region_price.csv` — справочник цен по регионам. Он загружается командой `load_region_prices`.
 
 ---
 
-## Обновление приложения
+## 9. Проверка
+
+Откройте в браузере: `http://93.77.182.91/`
+
+Админка: `http://93.77.182.91/admin/`
+
+---
+
+## Обновление приложения с GitHub
+
+### На сервере (Ubuntu / Yandex Cloud VM)
+
+Подключитесь по SSH и выполните по порядку:
 
 ```bash
-cd /opt/tkp_generator
-sudo -u www-data git pull
-sudo -u www-data /opt/tkp_generator/venv/bin/pip install -r requirements.txt
-sudo -u www-data /opt/tkp_generator/venv/bin/python manage.py migrate
-sudo -u www-data /opt/tkp_generator/venv/bin/python manage.py collectstatic --noinput
+# 1. Перейти в каталог проекта
+cd /home/mitrist12/tkp_generator
+
+# 2. Скачать изменения с GitHub
+git pull origin main
+
+# 3. Обновить зависимости Python
+/home/mitrist12/tkp_generator/venv/bin/pip install -r requirements.txt
+
+# 4. Применить миграции БД (если были изменения моделей)
+/home/mitrist12/tkp_generator/venv/bin/python manage.py migrate
+
+# 4a. Обновить справочник цен (если менялся region_price.csv)
+/home/mitrist12/tkp_generator/venv/bin/python manage.py load_region_prices
+
+# 5. Собрать статику
+/home/mitrist12/tkp_generator/venv/bin/python manage.py collectstatic --noinput
+
+# 6. Перезапустить приложение
 sudo systemctl restart tkp_generator
 ```
+
+Проверка: откройте в браузере сайт и админку. Логи при ошибках: `sudo journalctl -u tkp_generator -n 50`.
+
+### Локально (Windows)
+
+В папке проекта в PowerShell или командной строке:
+
+```powershell
+cd c:\Py_proj\dash_test
+git pull origin main
+pip install -r requirements.txt
+python manage.py migrate
+```
+
+После этого перезапустите сервер разработки (`python manage.py runserver`), если он был запущен.
 
 ---
 
