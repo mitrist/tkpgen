@@ -13,6 +13,7 @@ from django.conf import settings
 from django.http import FileResponse, Http404
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from docxtpl import DocxTemplate
 
@@ -480,9 +481,35 @@ def _save_complex_tkp_record(data):
     )
 
 
-@require_http_methods(['GET'])
+def _delete_tkp_files(base_name):
+    """Удаление файлов PDF и DOCX из TKP_output по base_name (номеру документа)."""
+    out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
+    for ext in ('pdf', 'docx'):
+        path = out_dir / f'{base_name}.{ext}'
+        if path.exists():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+
+@require_http_methods(['GET', 'POST'])
 def table_view(request):
-    """Страница перечня сформированных ТКП с фильтрами по каждому столбцу."""
+    """Страница перечня сформированных ТКП с фильтрами по каждому столбцу; удаление записей."""
+    if request.method == 'POST':
+        delete_id = request.POST.get('delete_id', '').strip()
+        if delete_id:
+            try:
+                rec = TKPRecord.objects.get(pk=delete_id)
+                base_name = rec.number
+                rec.delete()
+                _delete_tkp_files(base_name)
+                messages.success(request, 'Запись удалена.')
+            except TKPRecord.DoesNotExist:
+                messages.error(request, 'Запись не найдена.')
+        q = request.GET.urlencode()
+        url = reverse('proposals:table') + ('?' + q if q else '')
+        return redirect(url)
     records = TKPRecord.objects.all()
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()

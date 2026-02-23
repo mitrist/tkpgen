@@ -224,8 +224,22 @@ sudo systemctl reload nginx
 ```bash
 cd /home/mitrist12/tkp_generator
 git pull origin main
+chmod +x deploy.sh
 ./deploy.sh
 ```
+
+Если при первом запуске появляется «permission denied», выполните один раз: `chmod +x deploy.sh`. Либо запускайте скрипт так: `bash deploy.sh`.
+
+**Если Git пишет «your local changes would be overwritten by merge»:** на сервере не должны храниться свои правки — берём код только из репозитория. Сбросьте локальные изменения и снова подтяните код:
+
+```bash
+cd /home/mitrist12/tkp_generator
+git fetch origin
+git reset --hard origin/main
+./deploy.sh
+```
+
+Команда `git reset --hard origin/main` отменяет все локальные изменения в файлах и приводит каталог к состоянию ветки `main` на GitHub. Если нужно было что-то сохранить с сервера — перед этим сделайте копию: `cp -r /home/mitrist12/tkp_generator /home/mitrist12/tkp_generator.backup`.
 
 При необходимости обновить справочник цен по регионам после изменения `region_price.csv`:
 

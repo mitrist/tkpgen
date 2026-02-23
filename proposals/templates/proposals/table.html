@@ -58,6 +58,8 @@
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
             <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
+            <th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Удалить</th>
         </tr>
     </thead>
     <tbody>
@@ -69,10 +71,21 @@
             <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.service }}</td>
             <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+            <td style="padding: 0.4rem 0.5rem;">
+                <a href="{% url 'proposals:download_file' 'pdf' %}?f={{ r.number|urlencode }}" class="table-file-link">.pdf</a>
+                <a href="{% url 'proposals:download_file' 'docx' %}?f={{ r.number|urlencode }}" class="table-file-link">.docx</a>
+            </td>
+            <td style="padding: 0.4rem 0.5rem; text-align: center;">
+                <form method="post" action="{% url 'proposals:table' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Удалить эту запись и файлы ТКП?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="delete_id" value="{{ r.pk }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Удалить</button>
+                </form>
+            </td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="6" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
+            <td colspan="8" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -83,6 +96,8 @@
 </div>
 <style>
 .btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+.table-file-link { margin-right: 0.5rem; }
+.table-file-link:last-of-type { margin-right: 0; }
 @media (max-width: 992px) {
     .table-filters { display: block; }
     .table-filters tr { display: flex; flex-wrap: wrap; gap: 0.5rem; }
