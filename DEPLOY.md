@@ -219,29 +219,18 @@ sudo systemctl reload nginx
 
 ### На сервере (Ubuntu / Yandex Cloud VM)
 
-Подключитесь по SSH и выполните по порядку:
+Подключитесь по SSH и выполните:
 
 ```bash
-# 1. Перейти в каталог проекта
 cd /home/mitrist12/tkp_generator
-
-# 2. Скачать изменения с GitHub
 git pull origin main
+./deploy.sh
+```
 
-# 3. Обновить зависимости Python
-/home/mitrist12/tkp_generator/venv/bin/pip install -r requirements.txt
+При необходимости обновить справочник цен по регионам после изменения `region_price.csv`:
 
-# 4. Применить миграции БД (если были изменения моделей)
-/home/mitrist12/tkp_generator/venv/bin/python manage.py migrate
-
-# 4a. Обновить справочник цен (если менялся region_price.csv)
+```bash
 /home/mitrist12/tkp_generator/venv/bin/python manage.py load_region_prices
-
-# 5. Собрать статику
-/home/mitrist12/tkp_generator/venv/bin/python manage.py collectstatic --noinput
-
-# 6. Перезапустить приложение
-sudo systemctl restart tkp_generator
 ```
 
 Проверка: откройте в браузере сайт и админку. Логи при ошибках: `sudo journalctl -u tkp_generator -n 50`.
