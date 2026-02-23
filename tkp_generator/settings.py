@@ -85,9 +85,14 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [] if not (BASE_DIR / 'static').exists() else [BASE_DIR / 'static']
+STATICFILES_DIRS = [
+    *([] if not (BASE_DIR / 'static').exists() else [BASE_DIR / 'static']),
+    *([] if not (BASE_DIR / 'images').exists() else [BASE_DIR / 'images']),
+]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Папка с шаблонами .docx
 TEMPLATES_DOCX_DIR = BASE_DIR / 'templates_docx'
+# Папка для сформированных PDF и DOCX (скачивание)
+TKP_OUTPUT_DIR = BASE_DIR / 'TKP_output'

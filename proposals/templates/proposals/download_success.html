@@ -1,0 +1,14 @@
+{% extends "proposals/base.html" %}
+{% block title %}ТКП сформировано{% endblock %}
+{% block content %}
+<h1>ТКП сформировано</h1>
+<p>Скачайте файлы:</p>
+<div class="actions">
+    <a href="{% url 'proposals:download_file' 'pdf' %}?f={{ base_name }}" class="btn">Скачать PDF</a>
+    <a href="{% url 'proposals:download_file' 'docx' %}?f={{ base_name }}" class="btn btn-secondary">Скачать DOCX</a>
+</div>
+<p style="margin-top: 1.5rem;">
+    <a href="{% url 'proposals:form' %}" class="btn">Новое ТКП</a>
+    <a href="{% url 'proposals:table' %}" class="btn btn-secondary">Перечень ТКП</a>
+</p>
+{% endblock %}

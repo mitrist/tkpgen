@@ -5,36 +5,83 @@
 {% block content %}
 <div style="overflow-x: auto;">
 <h1>Перечень сформированных ТКП</h1>
-<table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+<form method="get" action="{% url 'proposals:table' %}" class="summary" style="margin-bottom: 1rem;">
+    <p style="margin: 0 0 0.5rem; font-weight: 600; font-size: 0.9rem;">Фильтры по столбцам</p>
+    <table class="table-filters" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+        <tr>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_date_from" style="font-size: 0.75rem;">Дата с</label>
+                <input type="date" name="date_from" id="id_date_from" value="{{ filters.date_from }}" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_date_to" style="font-size: 0.75rem;">Дата по</label>
+                <input type="date" name="date_to" id="id_date_to" value="{{ filters.date_to }}" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_number" style="font-size: 0.75rem;">Номер</label>
+                <input type="text" name="number" id="id_number" value="{{ filters.number }}" placeholder="часть номера" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_client" style="font-size: 0.75rem;">Клиент</label>
+                <input type="text" name="client" id="id_client" value="{{ filters.client }}" placeholder="часть названия" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_service" style="font-size: 0.75rem;">Услуга</label>
+                <select name="service" id="id_service" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+                    <option value="">Все</option>
+                    {% for sv in services_list %}
+                    <option value="{{ sv }}" {% if filters.service == sv %}selected{% endif %}>{{ sv }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_sum_min" style="font-size: 0.75rem;">Сумма от</label>
+                <input type="text" name="sum_min" id="id_sum_min" value="{{ filters.sum_min }}" placeholder="мин" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_sum_max" style="font-size: 0.75rem;">Сумма до</label>
+                <input type="text" name="sum_max" id="id_sum_max" value="{{ filters.sum_max }}" placeholder="макс" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom; white-space: nowrap;">
+                <button type="submit" class="btn btn-sm">Применить</button>
+                <a href="{% url 'proposals:table' %}" class="btn btn-secondary btn-sm" style="margin-left: 0.2rem;">Сбросить</a>
+            </td>
+        </tr>
+    </table>
+</form>
+<table class="table-tkp-list" style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8125rem;">
     <thead>
         <tr style="border-bottom: 2px solid var(--border);">
-            <th style="text-align: left; padding: 0.5rem;">Дата</th>
-            <th style="text-align: left; padding: 0.5rem;">Время</th>
-            <th style="text-align: left; padding: 0.5rem;">Номер документа</th>
-            <th style="text-align: left; padding: 0.5rem;">Клиент</th>
-            <th style="text-align: left; padding: 0.5rem;">Услуга</th>
-            <th style="text-align: right; padding: 0.5rem;">Сумма</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Время</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер документа</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
+            <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
         </tr>
     </thead>
     <tbody>
         {% for r in records %}
         <tr style="border-bottom: 1px solid var(--border);">
-            <td style="padding: 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
-            <td style="padding: 0.5rem;">{{ r.created_at|time:"H:i" }}</td>
-            <td style="padding: 0.5rem;">{{ r.number }}</td>
-            <td style="padding: 0.5rem;">{{ r.client|default:"—" }}</td>
-            <td style="padding: 0.5rem;">{{ r.service }}</td>
-            <td style="padding: 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.created_at|time:"H:i" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.number }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.service }}</td>
+            <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="6" style="padding: 1rem; color: var(--text-muted);">Нет сформированных ТКП</td>
+            <td colspan="6" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 <p style="margin-top: 1.5rem;">
-    <a href="{% url 'proposals:form' %}" class="btn">К форме ввода</a>
+    <a href="{% url 'proposals:form' %}" class="btn">Формирование ТКП</a>
 </p>
 </div>
+<style>
+.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+</style>
 {% endblock %}

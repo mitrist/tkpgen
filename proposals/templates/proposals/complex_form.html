@@ -1,0 +1,131 @@
+{% extends "proposals/base.html" %}
+{% block title %}Формирование комплексного ТКП{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<h1>Формирование комплексного ТКП</h1>
+<form method="post" action="{% url 'proposals:complex_form' %}" id="complex-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>{{ form.date.label_tag }}{{ form.date }}</div>
+        <div>{{ form.client.label_tag }}{{ form.client }}</div>
+        <div>{{ form.srok.label_tag }}{{ form.srok }}</div>
+    </div>
+    <div style="margin-bottom: 1rem;">
+        <div>{{ form.text1.label_tag }}{{ form.text1 }}{% if form.text1.help_text %}<p class="help">{{ form.text1.help_text }}</p>{% endif %}</div>
+        <div style="margin-top: 0.75rem;">{{ form.text2.label_tag }}{{ form.text2 }}{% if form.text2.help_text %}<p class="help">{{ form.text2.help_text }}</p>{% endif %}</div>
+    </div>
+    <p style="font-weight: 600; margin-bottom: 0.5rem;">Позиции ТКП</p>
+    <div style="overflow-x: auto; margin-bottom: 1rem;">
+        <table class="complex-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border);">
+                    <th style="text-align: left; padding: 0.5rem; width: 3rem;">№</th>
+                    <th style="text-align: left; padding: 0.5rem;">Наименование услуги</th>
+                    <th style="text-align: left; padding: 0.5rem; width: 6rem;">Ед. изм.</th>
+                    <th style="text-align: right; padding: 0.5rem; width: 7rem;">Количество</th>
+                    <th style="text-align: right; padding: 0.5rem; width: 8rem;">Цена за ед.</th>
+                    <th style="text-align: right; padding: 0.5rem; width: 8rem;">Стоимость</th>
+                    <th style="width: 3rem;"></th>
+                </tr>
+            </thead>
+            <tbody id="rows-tbody">
+                <tr class="row-template" data-row="0">
+                    <td style="padding: 0.5rem;" class="col-num">1</td>
+                    <td style="padding: 0.25rem;"><input type="text" class="input-service" placeholder="Наименование" style="margin: 0; width: 100%;"></td>
+                    <td style="padding: 0.25rem;">
+                        <select class="input-unit" style="margin: 0; width: 100%;">
+                            <option value="m2">м²</option>
+                            <option value="piece">шт</option>
+                        </select>
+                    </td>
+                    <td style="padding: 0.25rem;"><input type="number" class="input-qty" min="0" step="any" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
+                    <td style="padding: 0.25rem;"><input type="number" class="input-price" min="0" step="0.01" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
+                    <td style="padding: 0.5rem; text-align: right;" class="col-total">0</td>
+                    <td style="padding: 0.25rem;"><button type="button" class="btn-remove btn-secondary" style="padding: 0.35rem 0.5rem; font-size: 0.875rem;">×</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p style="margin-bottom: 1rem;">
+        <button type="button" id="add-row" class="btn btn-secondary">Добавить строку</button>
+    </p>
+    <input type="hidden" name="rows_json" id="rows-json" value="[]">
+    <div class="actions">
+        <button type="submit">Далее — подтверждение</button>
+    </div>
+</form>
+<script>
+(function() {
+    var tbody = document.getElementById('rows-tbody');
+    var hidden = document.getElementById('rows-json');
+    var rowIndex = 1;
+
+    function parseNum(el) { var v = parseFloat(el.value); return isNaN(v) ? 0 : v; }
+    function updateTotal(row) {
+        var qty = parseNum(row.querySelector('.input-qty'));
+        var price = parseNum(row.querySelector('.input-price'));
+        var total = row.querySelector('.col-total');
+        total.textContent = (qty * price).toFixed(2);
+    }
+    function renumber() {
+        [].forEach.call(tbody.querySelectorAll('tr'), function(tr, i) {
+            tr.querySelector('.col-num').textContent = i + 1;
+        });
+    }
+    function collectRows() {
+        var rows = [];
+        tbody.querySelectorAll('tr').forEach(function(tr) {
+            var service = (tr.querySelector('.input-service') || {}).value || '';
+            var unit = (tr.querySelector('.input-unit') || {}).value || 'm2';
+            var qty = parseNum(tr.querySelector('.input-qty'));
+            var price = parseNum(tr.querySelector('.input-price'));
+            rows.push({ service_name: service, unit: unit, quantity: qty, price_per_unit: price });
+        });
+        return rows;
+    }
+    function syncHidden() { hidden.value = JSON.stringify(collectRows()); }
+
+    tbody.addEventListener('input', function(e) {
+        if (e.target.matches('.input-qty, .input-price')) {
+            updateTotal(e.target.closest('tr'));
+            syncHidden();
+        }
+    });
+    tbody.addEventListener('change', function(e) {
+        if (e.target.matches('.input-unit')) syncHidden();
+    });
+
+    document.getElementById('add-row').addEventListener('click', function() {
+        var first = tbody.querySelector('tr');
+        var clone = first.cloneNode(true);
+        clone.classList.remove('row-template');
+        clone.setAttribute('data-row', rowIndex++);
+        clone.querySelector('.input-service').value = '';
+        clone.querySelector('.input-unit').value = 'm2';
+        clone.querySelector('.input-qty').value = '0';
+        clone.querySelector('.input-price').value = '0';
+        clone.querySelector('.col-total').textContent = '0';
+        tbody.appendChild(clone);
+        renumber();
+        syncHidden();
+    });
+
+    tbody.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-remove')) {
+            var tr = e.target.closest('tr');
+            if (tbody.querySelectorAll('tr').length > 1) {
+                tr.remove();
+                renumber();
+                syncHidden();
+            }
+        }
+    });
+
+    document.getElementById('complex-form').addEventListener('submit', function() {
+        syncHidden();
+    });
+    syncHidden();
+})();
+</script>
+{% endblock %}

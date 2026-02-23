@@ -35,7 +35,7 @@
 <form method="post">
     {% csrf_token %}
     <div class="actions">
-        <button type="submit">Подтвердить и скачать PDF</button>
+        <button type="submit">Подтвердить и сформировать ТКП</button>
         <a href="{% url 'proposals:form' %}" class="btn btn-secondary">Вернуться к форме</a>
     </div>
 </form>

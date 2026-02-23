@@ -1,0 +1,51 @@
+{% extends "proposals/base.html" %}
+{% load proposal_filters %}
+{% block title %}Тарифы по регионам{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<h1>Тарифы по регионам</h1>
+<p class="help">Добавьте или удалите пары «Услуга — Регион» с ценой за единицу. Эти тарифы используются при расчёте стоимости ТКП для внешнего заказчика.</p>
+
+<h2 style="font-size: 1.1rem; margin-top: 1.5rem;">Добавить тариф</h2>
+<form method="post" action="{% url 'proposals:tariffs' %}" style="margin-bottom: 1.5rem;">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn">Добавить</button>
+</form>
+
+<h2 style="font-size: 1.1rem; margin-top: 1.5rem;">Текущие тарифы</h2>
+<div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem;">Регион</th>
+                <th style="text-align: left; padding: 0.5rem;">Услуга</th>
+                <th style="text-align: left; padding: 0.5rem;">Ед. изм.</th>
+                <th style="text-align: right; padding: 0.5rem;">Цена за ед. (₽)</th>
+                <th style="width: 6rem;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tariffs_list %}
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.5rem;">{{ t.region.name }}</td>
+                <td style="padding: 0.5rem;">{{ t.service.name }}</td>
+                <td style="padding: 0.5rem;">{{ t.service.get_unit_type_display }}</td>
+                <td style="padding: 0.5rem; text-align: right;">{{ t.unit_price|format_price }}</td>
+                <td style="padding: 0.5rem;">
+                    <form method="post" action="{% url 'proposals:tariffs' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="delete_id" value="{{ t.pk }}">
+                        <button type="submit" class="btn btn-secondary" style="padding: 0.35rem 0.5rem; font-size: 0.875rem;">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="padding: 1rem; color: var(--text-muted);">Нет тарифов. Добавьте первую пару выше или загрузите из CSV: <code>python manage.py load_region_prices</code></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

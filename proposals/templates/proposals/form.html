@@ -2,7 +2,6 @@
 {% block title %}Формирование ТКП{% endblock %}
 {% block content %}
 <h1>Формирование ТКП</h1>
-<p><a href="{% url 'proposals:table' %}" class="btn btn-secondary">Перечень ТКП</a></p>
 <form method="post" action="{% url 'proposals:form' %}">
     {% csrf_token %}
     {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}

@@ -1,5 +1,5 @@
 """
-Management-команда для инициализации 5 услуг.
+Management-команда для инициализации услуг.
 Шаблоны уже есть в папке templates_docx/ проекта.
 """
 from django.core.management.base import BaseCommand
@@ -12,11 +12,14 @@ SERVICES = [
     (3, 'Навигация', 'Шаблон 3 Навигация.docx', Service.UNIT_PIECE),
     (4, 'Контент', 'Шаблон 4 Контент.docx', Service.UNIT_PIECE),
     (5, 'Навигация_стенды', 'Шаблон 5 Навигация_стенды.docx', Service.UNIT_M2),
+    (6, 'Фасад', 'Шаблон 6 Фасад.docx', Service.UNIT_M2),
+    (7, 'ДК Фасад', 'Шаблон 7 ДК Фасад.docx', Service.UNIT_M2),
+    (8, 'Благоустройство', 'Шаблон 8 Благоустройство.docx', Service.UNIT_M2),
 ]
 
 
 class Command(BaseCommand):
-    help = 'Создать 5 услуг: ДП, ДКП, Навигация, Контент, Навигация_стенды'
+    help = 'Создать услуги: ДП, ДКП, Навигация, Контент, Навигация_стенды, Фасад, ДК Фасад, Благоустройство'
 
     def add_arguments(self, parser):
         parser.add_argument(
