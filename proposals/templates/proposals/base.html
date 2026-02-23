@@ -49,31 +49,58 @@
         .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
         .help { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem; }
         .errorlist { color: #dc2626; font-size: 0.875rem; margin: 0 0 1rem; list-style: none; padding: 0; }
-        .menu-toggle { display: none; position: fixed; top: 0.75rem; left: 0.75rem; z-index: 1001; width: 2.5rem; height: 2.5rem; padding: 0; background: var(--sidebar-gradient); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; color: #fff; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
-        .menu-toggle:hover { background: #3d1f6b; }
-        .menu-toggle svg { width: 1.25rem; height: 1.25rem; }
-        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 999; opacity: 0; transition: opacity 0.2s; }
-        .sidebar-overlay.is-open { display: block; opacity: 1; }
+        .complex-table-wrap { overflow-x: auto; }
+        .topbar { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 1000; height: 52px; background: var(--sidebar-gradient); border-bottom: 1px solid rgba(255,255,255,.15); align-items: center; justify-content: space-between; padding: 0 1rem; }
+        .topbar-logo { display: flex; align-items: center; height: 100%; }
+        .topbar-logo img { max-height: 36px; width: auto; object-fit: contain; }
+        .topbar-menu-btn { width: 2.5rem; height: 2.5rem; padding: 0; border: none; background: transparent; color: #fff; cursor: pointer; align-items: center; justify-content: center; border-radius: 6px; }
+        .topbar-menu-btn:hover { background: rgba(255,255,255,.15); }
+        .topbar-menu-btn svg { width: 1.5rem; height: 1.5rem; }
+        .topbar-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #331A42; border-bottom: 1px solid rgba(255,255,255,.1); box-shadow: 0 4px 12px rgba(0,0,0,.3); z-index: 1001; }
+        .topbar-dropdown.is-open { display: block; }
+        .topbar-dropdown a { display: block; padding: 0.75rem 1rem; color: #fff; text-decoration: none; font-size: 0.9375rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+        .topbar-dropdown a:last-child { border-bottom: none; }
+        .topbar-dropdown a:hover { background: rgba(255,255,255,.1); }
+        .topbar-dropdown a.nav-active { background: rgba(255,255,255,.2); font-weight: 500; }
         @media (max-width: 768px) {
-            .menu-toggle { display: flex; }
-            .sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 1000; width: var(--sidebar-w); transform: translateX(-100%); transition: transform 0.25s ease; }
-            .sidebar.is-open { transform: translateX(0); }
-            .main { margin-left: 0; padding: 1rem; padding-top: 3.5rem; min-width: 0; }
+            .topbar { display: flex; }
+            .sidebar { display: none !important; }
+            .main { margin-left: 0; padding: 1rem; padding-top: 3.75rem; min-width: 0; }
             .card { padding: 1.25rem; }
             .container { max-width: none; }
             h1 { font-size: 1.25rem; }
             input, select, textarea, button, .btn { font-size: 16px; max-width: 100%; }
             .actions { flex-direction: column; align-items: stretch; }
             .actions .btn { text-align: center; }
-            body.menu-open { overflow: hidden; }
+            .topbar-dropdown.is-open { display: block; }
+            .complex-table-wrap { overflow: visible; max-width: 100%; }
+            .complex-table thead { display: none; }
+            .complex-table tbody tr { display: block; margin-bottom: 0.75rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: #f9fafb; }
+            .complex-table tbody td { display: block; padding: 0.35rem 0; border: none; }
+            .complex-table tbody td::before { content: attr(data-label); font-weight: 600; color: var(--text-muted); font-size: 0.75rem; display: block; margin-bottom: 0.15rem; }
+            .complex-table tbody td.col-num::before { content: attr(data-label); }
+            .complex-table tbody .btn-remove { margin-top: 0.5rem; }
+            .complex-table tbody td[data-label=""]::before { display: none; }
+            .complex-form-header { grid-template-columns: 1fr !important; }
         }
     </style>
 </head>
 <body>
-    <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Открыть меню">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-    </button>
-    <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
+    <header class="topbar" id="topbar">
+        <a href="{% url 'proposals:form' %}" class="topbar-logo">
+            <img src="{% static 'logo.png' %}" alt="Генератор ТКП" />
+        </a>
+        <button type="button" class="topbar-menu-btn" id="topbar-menu-btn" aria-label="Меню" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <nav class="topbar-dropdown" id="topbar-dropdown" aria-hidden="true">
+            <a href="{% url 'proposals:form' %}" {% if request.resolver_match.url_name == 'form' or request.resolver_match.url_name == 'confirm' or request.resolver_match.url_name == 'download_success' %}class="nav-active"{% endif %}>Формирование ТКП</a>
+            <a href="{% url 'proposals:complex_form' %}" {% if request.resolver_match.url_name == 'complex_form' or request.resolver_match.url_name == 'complex_confirm' %}class="nav-active"{% endif %}>Комплексное ТКП</a>
+            <a href="{% url 'proposals:table' %}" {% if request.resolver_match.url_name == 'table' %}class="nav-active"{% endif %}>Перечень ТКП</a>
+            <a href="{% url 'proposals:tariffs' %}" {% if request.resolver_match.url_name == 'tariffs' %}class="nav-active"{% endif %}>Тарифы по регионам</a>
+            <a href="https://www.plksoft.ru" target="_blank" rel="noopener noreferrer">PLK Soft</a>
+        </nav>
+    </header>
     <div class="layout">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -108,33 +135,31 @@
     </div>
     <script>
     (function() {
-        var sidebar = document.getElementById('sidebar');
-        var overlay = document.getElementById('sidebar-overlay');
-        var toggle = document.getElementById('menu-toggle');
+        var btn = document.getElementById('topbar-menu-btn');
+        var dropdown = document.getElementById('topbar-dropdown');
+        if (!btn || !dropdown) return;
         function openMenu() {
-            sidebar.classList.add('is-open');
-            overlay.classList.add('is-open');
-            document.body.classList.add('menu-open');
-            overlay.setAttribute('aria-hidden', 'false');
-            toggle.setAttribute('aria-label', 'Закрыть меню');
+            dropdown.classList.add('is-open');
+            dropdown.setAttribute('aria-hidden', 'false');
+            btn.setAttribute('aria-expanded', 'true');
         }
         function closeMenu() {
-            sidebar.classList.remove('is-open');
-            overlay.classList.remove('is-open');
-            document.body.classList.remove('menu-open');
-            overlay.setAttribute('aria-hidden', 'true');
-            toggle.setAttribute('aria-label', 'Открыть меню');
+            dropdown.classList.remove('is-open');
+            dropdown.setAttribute('aria-hidden', 'true');
+            btn.setAttribute('aria-expanded', 'false');
         }
         function toggleMenu() {
-            if (sidebar.classList.contains('is-open')) closeMenu(); else openMenu();
+            if (dropdown.classList.contains('is-open')) closeMenu(); else openMenu();
         }
-        toggle.addEventListener('click', toggleMenu);
-        overlay.addEventListener('click', closeMenu);
-        sidebar.querySelectorAll('nav a').forEach(function(a) {
-            a.addEventListener('click', function() { closeMenu(); });
+        btn.addEventListener('click', toggleMenu);
+        dropdown.querySelectorAll('a').forEach(function(a) {
+            a.addEventListener('click', closeMenu);
+        });
+        document.addEventListener('click', function(e) {
+            if (dropdown.classList.contains('is-open') && !dropdown.contains(e.target) && !btn.contains(e.target)) closeMenu();
         });
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && sidebar.classList.contains('is-open')) closeMenu();
+            if (e.key === 'Escape' && dropdown.classList.contains('is-open')) closeMenu();
         });
     })();
     </script>

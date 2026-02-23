@@ -6,7 +6,7 @@
 <form method="post" action="{% url 'proposals:complex_form' %}" id="complex-form">
     {% csrf_token %}
     {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+    <div class="complex-form-header" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
         <div>{{ form.date.label_tag }}{{ form.date }}</div>
         <div>{{ form.client.label_tag }}{{ form.client }}</div>
         <div>{{ form.srok.label_tag }}{{ form.srok }}</div>
@@ -16,7 +16,7 @@
         <div style="margin-top: 0.75rem;">{{ form.text2.label_tag }}{{ form.text2 }}{% if form.text2.help_text %}<p class="help">{{ form.text2.help_text }}</p>{% endif %}</div>
     </div>
     <p style="font-weight: 600; margin-bottom: 0.5rem;">Позиции ТКП</p>
-    <div style="overflow-x: auto; margin-bottom: 1rem;">
+    <div class="complex-table-wrap" style="margin-bottom: 1rem;">
         <table class="complex-table" style="width: 100%; border-collapse: collapse;">
             <thead>
                 <tr style="border-bottom: 2px solid var(--border);">
@@ -31,18 +31,18 @@
             </thead>
             <tbody id="rows-tbody">
                 <tr class="row-template" data-row="0">
-                    <td style="padding: 0.5rem;" class="col-num">1</td>
-                    <td style="padding: 0.25rem;"><input type="text" class="input-service" placeholder="Наименование" style="margin: 0; width: 100%;"></td>
-                    <td style="padding: 0.25rem;">
+                    <td style="padding: 0.5rem;" class="col-num" data-label="№">1</td>
+                    <td style="padding: 0.25rem;" data-label="Наименование услуги"><input type="text" class="input-service" placeholder="Наименование" style="margin: 0; width: 100%;"></td>
+                    <td style="padding: 0.25rem;" data-label="Ед. изм.">
                         <select class="input-unit" style="margin: 0; width: 100%;">
                             <option value="m2">м²</option>
                             <option value="piece">шт</option>
                         </select>
                     </td>
-                    <td style="padding: 0.25rem;"><input type="number" class="input-qty" min="0" step="any" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
-                    <td style="padding: 0.25rem;"><input type="number" class="input-price" min="0" step="0.01" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
-                    <td style="padding: 0.5rem; text-align: right;" class="col-total">0</td>
-                    <td style="padding: 0.25rem;"><button type="button" class="btn-remove btn-secondary" style="padding: 0.35rem 0.5rem; font-size: 0.875rem;">×</button></td>
+                    <td style="padding: 0.25rem;" data-label="Количество"><input type="number" class="input-qty" min="0" step="any" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
+                    <td style="padding: 0.25rem;" data-label="Цена за ед."><input type="number" class="input-price" min="0" step="0.01" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
+                    <td style="padding: 0.5rem; text-align: right;" class="col-total" data-label="Стоимость">0</td>
+                    <td style="padding: 0.25rem;" data-label=""><button type="button" class="btn-remove btn-secondary" style="padding: 0.35rem 0.5rem; font-size: 0.875rem;">× Удалить</button></td>
                 </tr>
             </tbody>
         </table>
