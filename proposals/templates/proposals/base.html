@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>{% block title %}Генератор ТКП{% endblock %}</title>
     {% load static %}
     <style>
@@ -62,7 +62,7 @@
         .topbar-dropdown a:last-child { border-bottom: none; }
         .topbar-dropdown a:hover { background: rgba(255,255,255,.1); }
         .topbar-dropdown a.nav-active { background: rgba(255,255,255,.2); font-weight: 500; }
-        @media (max-width: 768px) {
+        @media (max-width: 992px) {
             .topbar { display: flex; }
             .sidebar { display: none !important; }
             .main { margin-left: 0; padding: 1rem; padding-top: 3.75rem; min-width: 0; }
