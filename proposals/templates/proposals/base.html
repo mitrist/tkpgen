@@ -49,11 +49,33 @@
         .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
         .help { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem; }
         .errorlist { color: #dc2626; font-size: 0.875rem; margin: 0 0 1rem; list-style: none; padding: 0; }
+        .menu-toggle { display: none; position: fixed; top: 0.75rem; left: 0.75rem; z-index: 1001; width: 2.5rem; height: 2.5rem; padding: 0; background: var(--sidebar-gradient); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; color: #fff; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+        .menu-toggle:hover { background: #3d1f6b; }
+        .menu-toggle svg { width: 1.25rem; height: 1.25rem; }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 999; opacity: 0; transition: opacity 0.2s; }
+        .sidebar-overlay.is-open { display: block; opacity: 1; }
+        @media (max-width: 768px) {
+            .menu-toggle { display: flex; }
+            .sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 1000; width: var(--sidebar-w); transform: translateX(-100%); transition: transform 0.25s ease; }
+            .sidebar.is-open { transform: translateX(0); }
+            .main { margin-left: 0; padding: 1rem; padding-top: 3.5rem; min-width: 0; }
+            .card { padding: 1.25rem; }
+            .container { max-width: none; }
+            h1 { font-size: 1.25rem; }
+            input, select, textarea, button, .btn { font-size: 16px; max-width: 100%; }
+            .actions { flex-direction: column; align-items: stretch; }
+            .actions .btn { text-align: center; }
+            body.menu-open { overflow: hidden; }
+        }
     </style>
 </head>
 <body>
+    <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Открыть меню">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
     <div class="layout">
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <a href="{% url 'proposals:form' %}">
                     <img src="{% static 'logo.png' %}" alt="Логотип" />
@@ -84,5 +106,37 @@
             </div>
         </main>
     </div>
+    <script>
+    (function() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebar-overlay');
+        var toggle = document.getElementById('menu-toggle');
+        function openMenu() {
+            sidebar.classList.add('is-open');
+            overlay.classList.add('is-open');
+            document.body.classList.add('menu-open');
+            overlay.setAttribute('aria-hidden', 'false');
+            toggle.setAttribute('aria-label', 'Закрыть меню');
+        }
+        function closeMenu() {
+            sidebar.classList.remove('is-open');
+            overlay.classList.remove('is-open');
+            document.body.classList.remove('menu-open');
+            overlay.setAttribute('aria-hidden', 'true');
+            toggle.setAttribute('aria-label', 'Открыть меню');
+        }
+        function toggleMenu() {
+            if (sidebar.classList.contains('is-open')) closeMenu(); else openMenu();
+        }
+        toggle.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', closeMenu);
+        sidebar.querySelectorAll('nav a').forEach(function(a) {
+            a.addEventListener('click', function() { closeMenu(); });
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && sidebar.classList.contains('is-open')) closeMenu();
+        });
+    })();
+    </script>
 </body>
 </html>

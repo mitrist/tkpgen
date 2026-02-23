@@ -83,5 +83,13 @@
 </div>
 <style>
 .btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+@media (max-width: 768px) {
+    .table-filters { display: block; }
+    .table-filters tr { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .table-filters td { display: block; flex: 1 1 140px; min-width: 0; }
+    .table-filters td:last-child { flex: 1 1 100%; }
+    .table-tkp-list { font-size: 0.75rem; }
+    .table-tkp-list th, .table-tkp-list td { padding: 0.35rem 0.4rem; }
+}
 </style>
 {% endblock %}
