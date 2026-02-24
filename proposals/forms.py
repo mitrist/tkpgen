@@ -108,7 +108,14 @@ SROK_CHOICES = [
 
 
 class ComplexProposalForm(forms.Form):
-    """Форма комплексного ТКП: дата, клиент, срок, опционально text1/text2. Строки передаются отдельно (JSON)."""
+    """Форма комплексного ТКП: регион, дата, клиент, срок, опционально text1/text2. Строки передаются отдельно (JSON)."""
+    region = forms.ModelChoiceField(
+        label='Регион',
+        queryset=Region.objects.none(),
+        empty_label='Выберите регион',
+        required=True,
+        help_text='Регион, для которого формируется ТКП (по нему подставляются цены в таблице)',
+    )
     date = forms.DateField(
         label='Дата ТКП',
         widget=forms.DateInput(attrs={'type': 'date'}),
@@ -128,6 +135,10 @@ class ComplexProposalForm(forms.Form):
         required=False,
         help_text='По желанию. Если пусто — в ТКП не попадает.',
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['region'].queryset = Region.objects.all().order_by('name')
 
 
 class TariffForm(forms.Form):

@@ -284,9 +284,12 @@ def complex_form_view(request):
                 }
                 for r in rows
             ]
+            region = form.cleaned_data['region']
             data = {
                 'date': form.cleaned_data['date'].strftime('%Y-%m-%d'),
                 'client': (form.cleaned_data['client'] or '').strip(),
+                'region_id': region.pk,
+                'region_name': region.name,
                 'srok': form.cleaned_data.get('srok') or '',
                 'rows': rows_serializable,
                 'text1': (form.cleaned_data.get('text1') or '').strip(),
@@ -298,7 +301,21 @@ def complex_form_view(request):
             messages.error(request, row_error)
     else:
         form = ComplexProposalForm()
-    return render(request, 'proposals/complex_form.html', {'form': form})
+    services = list(Service.objects.order_by('order', 'name').values('id', 'name', 'unit_type'))
+    prices_qs = RegionServicePrice.objects.select_related('region', 'service').all()
+    region_prices = {}
+    for rsp in prices_qs:
+        rid, sid = str(rsp.region_id), str(rsp.service_id)
+        if rid not in region_prices:
+            region_prices[rid] = {}
+        region_prices[rid][sid] = str(rsp.unit_price)
+    context = {
+        'form': form,
+        'services': services,
+        'services_json': json.dumps(services, ensure_ascii=False),
+        'region_prices_json': json.dumps(region_prices, ensure_ascii=False),
+    }
+    return render(request, 'proposals/complex_form.html', context)
 
 
 @login_required
@@ -337,6 +354,7 @@ def complex_confirm_view(request):
     context = {
         'date': date_display,
         'client': data['client'],
+        'region_name': data.get('region_name', ''),
         'srok': data.get('srok', ''),
         'rows': rows_display,
         'total_sum': _format_price(total_sum),

@@ -6,6 +6,8 @@
 <dl class="summary">
     <dt>Дата</dt>
     <dd>{{ date }}</dd>
+    <dt>Регион</dt>
+    <dd>{{ region_name|default:"—" }}</dd>
     <dt>Наименование клиента</dt>
     <dd>{{ client }}</dd>
     {% if srok %}

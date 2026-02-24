@@ -7,6 +7,7 @@
     {% csrf_token %}
     {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
     <div class="complex-form-header" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>{{ form.region.label_tag }}{{ form.region }}{% if form.region.help_text %}<p class="help">{{ form.region.help_text }}</p>{% endif %}</div>
         <div>{{ form.date.label_tag }}{{ form.date }}</div>
         <div>{{ form.client.label_tag }}{{ form.client }}</div>
         <div>{{ form.srok.label_tag }}{{ form.srok }}</div>
@@ -32,7 +33,14 @@
             <tbody id="rows-tbody">
                 <tr class="row-template" data-row="0">
                     <td style="padding: 0.5rem;" class="col-num" data-label="№">1</td>
-                    <td style="padding: 0.25rem;" data-label="Наименование услуги"><input type="text" class="input-service" placeholder="Наименование" style="margin: 0; width: 100%;"></td>
+                    <td style="padding: 0.25rem;" data-label="Наименование услуги">
+                        <select class="input-service" style="margin: 0; width: 100%;">
+                            <option value="">— Выберите услугу —</option>
+                            {% for s in services %}
+                            <option value="{{ s.id }}" data-unit="{{ s.unit_type }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
                     <td style="padding: 0.25rem;" data-label="Ед. изм.">
                         <select class="input-unit" style="margin: 0; width: 100%;">
                             <option value="m2">м²</option>
@@ -59,7 +67,9 @@
 (function() {
     var tbody = document.getElementById('rows-tbody');
     var hidden = document.getElementById('rows-json');
+    var regionSelect = document.getElementById('id_region');
     var rowIndex = 1;
+    var regionPrices = {{ region_prices_json|safe }};
 
     function parseNum(el) { var v = parseFloat(el.value); return isNaN(v) ? 0 : v; }
     function updateTotal(row) {
@@ -73,14 +83,37 @@
             tr.querySelector('.col-num').textContent = i + 1;
         });
     }
+    function applyServiceAndPrice(row) {
+        var serviceSelect = row.querySelector('.input-service');
+        var unitSelect = row.querySelector('.input-unit');
+        var priceInput = row.querySelector('.input-price');
+        var opt = serviceSelect && serviceSelect.options[serviceSelect.selectedIndex];
+        if (!opt || !opt.value) {
+            if (unitSelect) unitSelect.value = 'm2';
+            if (priceInput) priceInput.value = '0';
+            return;
+        }
+        var unit = opt.getAttribute('data-unit') || 'm2';
+        if (unitSelect) unitSelect.value = unit;
+        var regionId = regionSelect ? regionSelect.value : '';
+        if (regionId && regionPrices[regionId] && regionPrices[regionId][opt.value] !== undefined) {
+            priceInput.value = regionPrices[regionId][opt.value];
+        }
+        updateTotal(row);
+    }
     function collectRows() {
         var rows = [];
         tbody.querySelectorAll('tr').forEach(function(tr) {
-            var service = (tr.querySelector('.input-service') || {}).value || '';
+            var serviceSelect = tr.querySelector('.input-service');
+            var serviceName = '';
+            if (serviceSelect && serviceSelect.selectedIndex >= 0) {
+                var opt = serviceSelect.options[serviceSelect.selectedIndex];
+                if (opt && opt.value) serviceName = opt.text || '';
+            }
             var unit = (tr.querySelector('.input-unit') || {}).value || 'm2';
             var qty = parseNum(tr.querySelector('.input-qty'));
             var price = parseNum(tr.querySelector('.input-price'));
-            rows.push({ service_name: service, unit: unit, quantity: qty, price_per_unit: price });
+            rows.push({ service_name: serviceName, unit: unit, quantity: qty, price_per_unit: price });
         });
         return rows;
     }
@@ -93,16 +126,31 @@
         }
     });
     tbody.addEventListener('change', function(e) {
-        if (e.target.matches('.input-unit')) syncHidden();
+        if (e.target.matches('.input-unit')) { syncHidden(); return; }
+        if (e.target.matches('.input-service')) {
+            applyServiceAndPrice(e.target.closest('tr'));
+            syncHidden();
+        }
     });
+
+    if (regionSelect) {
+        regionSelect.addEventListener('change', function() {
+            tbody.querySelectorAll('tr').forEach(function(tr) {
+                applyServiceAndPrice(tr);
+            });
+            syncHidden();
+        });
+    }
 
     document.getElementById('add-row').addEventListener('click', function() {
         var first = tbody.querySelector('tr');
         var clone = first.cloneNode(true);
         clone.classList.remove('row-template');
         clone.setAttribute('data-row', rowIndex++);
-        clone.querySelector('.input-service').value = '';
-        clone.querySelector('.input-unit').value = 'm2';
+        var sv = clone.querySelector('.input-service');
+        if (sv) sv.value = '';
+        var uv = clone.querySelector('.input-unit');
+        if (uv) uv.value = 'm2';
         clone.querySelector('.input-qty').value = '0';
         clone.querySelector('.input-price').value = '0';
         clone.querySelector('.col-total').textContent = '0';
