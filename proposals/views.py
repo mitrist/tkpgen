@@ -435,22 +435,32 @@ def _set_table_borders(table, sz='4', val='single', color='000000'):
 
 
 def _build_complex_table_document(rows_ctx, total_sum_formatted):
-    """Создаёт Document с одной таблицей позиций (для вставки в основной docx). Без колонки №."""
+    """Создаёт Document с одной таблицей позиций (для вставки в основной docx). Без колонки №.
+    Ширины задаются и в ячейках (Word), и в tblGrid (LibreOffice)."""
     from docx import Document
+    from docx.oxml.ns import qn
     from docx.shared import Inches
     doc = Document()
     table = doc.add_table(rows=len(rows_ctx) + 2, cols=6)  # заголовок + строки + итого
     _set_table_borders(table)
-    # Word учитывает ширину только при задании на ячейках
     table.autofit = False
     if hasattr(table, 'allow_autofit'):
         table.allow_autofit = False
     table.width = Inches(6.5)
-    comment_width = Inches(2.28)  # 35% от 6.5"
-    col_widths = (Inches(1.5), comment_width, Inches(0.55), Inches(0.6), Inches(0.85), Inches(0.9))
+    # Ширины: Компонент 1.5", Комментарий 35% (2.28"), остальные фиксированы
+    col_widths_inches = (1.5, 2.28, 0.55, 0.6, 0.85, 0.9)
+    col_widths = tuple(Inches(w) for w in col_widths_inches)
+    # Word: ширина на каждой ячейке
     for row in table.rows:
         for col_idx, width in enumerate(col_widths):
             row.cells[col_idx].width = width
+    # LibreOffice (прод): ширина в tblGrid/gridCol (w:w в twips, 1" = 1440 twips)
+    tbl_grid = table._tbl.tblGrid
+    if tbl_grid is not None:
+        grid_cols = tbl_grid.findall(qn('w:gridCol'))
+        for col_idx, w_inch in enumerate(col_widths_inches):
+            if col_idx < len(grid_cols):
+                grid_cols[col_idx].set(qn('w:w'), str(int(round(w_inch * 1440))))
     header = table.rows[0].cells
     headers_text = ('Компонент услуги', 'Комментарий', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Стоимость')
     for i, text in enumerate(headers_text):
