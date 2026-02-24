@@ -99,7 +99,10 @@
             <a href="{% url 'proposals:table' %}" {% if request.resolver_match.url_name == 'table' %}class="nav-active"{% endif %}>Перечень ТКП</a>
             <a href="{% url 'proposals:tariffs' %}" {% if request.resolver_match.url_name == 'tariffs' %}class="nav-active"{% endif %}>Тарифы по регионам</a>
             <a href="https://www.plksoft.ru" target="_blank" rel="noopener noreferrer">PLK Soft</a>
-            <a href="{% url 'logout' %}">Выйти</a>
+            <form method="post" action="{% url 'logout' %}" style="margin: 0; padding: 0; display: block;">
+                {% csrf_token %}
+                <button type="submit" style="background: none; border: none; padding: 0.75rem 1rem; color: #fff; font-size: 0.9375rem; cursor: pointer; width: 100%; text-align: left; font-family: inherit;">Выйти</button>
+            </form>
         </nav>
     </header>
     <div class="layout">
@@ -116,7 +119,10 @@
                 <a href="{% url 'proposals:tariffs' %}" {% if request.resolver_match.url_name == 'tariffs' %}class="nav-active"{% endif %}>Тарифы по регионам</a>
             </nav>
             <div class="sidebar-footer">
-                <a href="{% url 'logout' %}" style="display: block; padding: 0.5rem 1.25rem; color: rgba(255,255,255,.9); text-decoration: none; font-size: 0.9rem;">Выйти</a>
+                <form method="post" action="{% url 'logout' %}" style="margin: 0 0 0.5rem 0; padding: 0;">
+                    {% csrf_token %}
+                    <button type="submit" style="background: none; border: none; padding: 0.5rem 1.25rem; color: rgba(255,255,255,.9); font-size: 0.9rem; cursor: pointer; text-decoration: none;">Выйти</button>
+                </form>
                 <a href="https://www.plksoft.ru" target="_blank" rel="noopener noreferrer">
                     <img src="{% static 'plk_logo.png' %}" alt="PLK" />
                 </a>
