@@ -435,28 +435,38 @@ def _set_table_borders(table, sz='4', val='single', color='000000'):
 
 
 def _build_complex_table_document(rows_ctx, total_sum_formatted):
-    """Создаёт Document с одной таблицей позиций (для вставки в основной docx)."""
+    """Создаёт Document с одной таблицей позиций (для вставки в основной docx). Без колонки №."""
     from docx import Document
+    from docx.shared import Inches
     doc = Document()
-    table = doc.add_table(rows=len(rows_ctx) + 2, cols=7)  # заголовок + строки + итого
+    table = doc.add_table(rows=len(rows_ctx) + 2, cols=6)  # заголовок + строки + итого
     _set_table_borders(table)
+    # Word учитывает ширину только при задании на ячейках
+    table.autofit = False
+    if hasattr(table, 'allow_autofit'):
+        table.allow_autofit = False
+    table.width = Inches(6.5)
+    comment_width = Inches(2.28)  # 35% от 6.5"
+    col_widths = (Inches(1.5), comment_width, Inches(0.55), Inches(0.6), Inches(0.85), Inches(0.9))
+    for row in table.rows:
+        for col_idx, width in enumerate(col_widths):
+            row.cells[col_idx].width = width
     header = table.rows[0].cells
-    headers_text = ('№', 'Компонент услуги', 'Комментарий', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Стоимость')
+    headers_text = ('Компонент услуги', 'Комментарий', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Стоимость')
     for i, text in enumerate(headers_text):
         header[i].text = text
         for run in header[i].paragraphs[0].runs:
             run.bold = True
     for i, r in enumerate(rows_ctx, 1):
         row_cells = table.rows[i].cells
-        row_cells[0].text = str(r['num'])
-        row_cells[1].text = r['service_name']
-        row_cells[2].text = r.get('comment', '')
-        row_cells[3].text = r['unit_display']
-        row_cells[4].text = r['quantity']
-        row_cells[5].text = r['price_per_unit']
-        row_cells[6].text = r['total_formatted']
+        row_cells[0].text = r['service_name']
+        row_cells[1].text = r.get('comment', '')
+        row_cells[2].text = r['unit_display']
+        row_cells[3].text = r['quantity']
+        row_cells[4].text = r['price_per_unit']
+        row_cells[5].text = r['total_formatted']
     last = table.rows[len(rows_ctx) + 1].cells
-    last[0].merge(last[6])
+    last[0].merge(last[5])
     last[0].text = f"Итого: {total_sum_formatted} ₽"
     return doc
 
