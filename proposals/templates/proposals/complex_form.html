@@ -18,22 +18,29 @@
     </div>
     <p style="font-weight: 600; margin-bottom: 0.5rem;">Позиции ТКП</p>
     <div class="complex-table-wrap" style="margin-bottom: 1rem;">
-        <table class="complex-table" style="width: 100%; border-collapse: collapse;">
+        <table class="complex-table" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+            <colgroup>
+                <col style="width: 12rem;">
+                <col style="width: 30%;">
+                <col style="width: 5.5rem;">
+                <col style="width: 5.5rem;">
+                <col style="width: 6.5rem;">
+                <col style="width: 6.5rem;">
+                <col style="width: 3rem;">
+            </colgroup>
             <thead>
                 <tr style="border-bottom: 2px solid var(--border);">
-                    <th style="text-align: left; padding: 0.5rem; width: 3rem;">№</th>
                     <th style="text-align: left; padding: 0.5rem;">Компонент услуги</th>
                     <th style="text-align: left; padding: 0.5rem;">Комментарий</th>
-                    <th style="text-align: left; padding: 0.5rem; width: 6rem;">Ед. изм.</th>
-                    <th style="text-align: right; padding: 0.5rem; width: 6rem;">Количество</th>
-                    <th style="text-align: right; padding: 0.5rem; width: 7rem;">Цена за ед.</th>
-                    <th style="text-align: right; padding: 0.5rem; width: 7rem;">Стоимость</th>
-                    <th style="width: 3rem;"></th>
+                    <th style="text-align: left; padding: 0.5rem;">Ед. изм.</th>
+                    <th style="text-align: right; padding: 0.5rem;">Количество</th>
+                    <th style="text-align: right; padding: 0.5rem;">Цена за ед.</th>
+                    <th style="text-align: right; padding: 0.5rem;">Стоимость</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody id="rows-tbody">
                 <tr class="row-template" data-row="0">
-                    <td style="padding: 0.5rem;" class="col-num" data-label="№">1</td>
                     <td style="padding: 0.25rem;" data-label="Компонент услуги">
                         <select class="input-service" style="margin: 0; width: 100%;">
                             <option value="">— Выберите услугу —</option>
@@ -80,11 +87,6 @@
         var price = parseNum(row.querySelector('.input-price'));
         var total = row.querySelector('.col-total');
         total.textContent = (qty * price).toFixed(2);
-    }
-    function renumber() {
-        [].forEach.call(tbody.querySelectorAll('tr'), function(tr, i) {
-            tr.querySelector('.col-num').textContent = i + 1;
-        });
     }
     function applyServiceAndPrice(row) {
         var serviceSelect = row.querySelector('.input-service');
@@ -166,7 +168,6 @@
         clone.querySelector('.input-price').value = '0';
         clone.querySelector('.col-total').textContent = '0';
         tbody.appendChild(clone);
-        renumber();
         syncHidden();
     });
 
@@ -175,7 +176,6 @@
             var tr = e.target.closest('tr');
             if (tbody.querySelectorAll('tr').length > 1) {
                 tr.remove();
-                renumber();
                 syncHidden();
             }
         }
