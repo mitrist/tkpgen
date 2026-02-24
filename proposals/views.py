@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404
 from django.contrib import messages
 from django.shortcuts import redirect, render
@@ -87,6 +88,7 @@ def _format_price(value):
     return result
 
 
+@login_required
 @require_http_methods(['GET', 'POST'])
 def form_view(request):
     """Шаг 1: форма ввода параметров ТКП."""
@@ -143,6 +145,7 @@ def form_view(request):
     })
 
 
+@login_required
 @require_http_methods(['GET', 'POST'])
 def confirm_view(request):
     """Шаг 2: подтверждение и скачивание PDF."""
@@ -185,6 +188,7 @@ def confirm_view(request):
     return render(request, 'proposals/confirm.html', context)
 
 
+@login_required
 @require_http_methods(['GET'])
 def download_success_view(request):
     """Страница после формирования ТКП: ссылки на скачивание PDF и DOCX."""
@@ -199,6 +203,7 @@ def download_success_view(request):
     return render(request, 'proposals/download_success.html', context)
 
 
+@login_required
 @require_http_methods(['GET'])
 def download_file_view(request, file_type):
     """Отдача PDF или DOCX по base_name из GET-параметра (для скачивания после формирования)."""
@@ -259,6 +264,7 @@ def _parse_complex_rows(rows_data):
     return result, None
 
 
+@login_required
 @require_http_methods(['GET', 'POST'])
 def complex_form_view(request):
     """Форма комплексного ТКП: дата, клиент, срок, таблица строк."""
@@ -295,6 +301,7 @@ def complex_form_view(request):
     return render(request, 'proposals/complex_form.html', {'form': form})
 
 
+@login_required
 @require_http_methods(['GET', 'POST'])
 def complex_confirm_view(request):
     """Подтверждение комплексного ТКП и генерация docx/pdf."""
@@ -493,6 +500,7 @@ def _delete_tkp_files(base_name):
                 pass
 
 
+@login_required
 @require_http_methods(['GET', 'POST'])
 def table_view(request):
     """Страница перечня сформированных ТКП с фильтрами по каждому столбцу; удаление записей."""
@@ -563,6 +571,7 @@ def table_view(request):
     return render(request, 'proposals/table.html', context)
 
 
+@login_required
 @require_http_methods(['GET', 'POST'])
 def tariffs_view(request):
     """Редактирование тарифов по регионам: список пар Услуга–Регион и форма добавления."""

@@ -92,6 +92,11 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Вход по паролю: до авторизации доступ закрыт
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/accounts/login/'
+
 # Папка с шаблонами .docx
 TEMPLATES_DOCX_DIR = BASE_DIR / 'templates_docx'
 # Папка для сформированных PDF и DOCX (скачивание)

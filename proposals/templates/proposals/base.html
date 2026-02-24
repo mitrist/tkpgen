@@ -99,6 +99,7 @@
             <a href="{% url 'proposals:table' %}" {% if request.resolver_match.url_name == 'table' %}class="nav-active"{% endif %}>Перечень ТКП</a>
             <a href="{% url 'proposals:tariffs' %}" {% if request.resolver_match.url_name == 'tariffs' %}class="nav-active"{% endif %}>Тарифы по регионам</a>
             <a href="https://www.plksoft.ru" target="_blank" rel="noopener noreferrer">PLK Soft</a>
+            <a href="{% url 'logout' %}">Выйти</a>
         </nav>
     </header>
     <div class="layout">
@@ -115,6 +116,7 @@
                 <a href="{% url 'proposals:tariffs' %}" {% if request.resolver_match.url_name == 'tariffs' %}class="nav-active"{% endif %}>Тарифы по регионам</a>
             </nav>
             <div class="sidebar-footer">
+                <a href="{% url 'logout' %}" style="display: block; padding: 0.5rem 1.25rem; color: rgba(255,255,255,.9); text-decoration: none; font-size: 0.9rem;">Выйти</a>
                 <a href="https://www.plksoft.ru" target="_blank" rel="noopener noreferrer">
                     <img src="{% static 'plk_logo.png' %}" alt="PLK" />
                 </a>

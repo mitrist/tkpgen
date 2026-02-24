@@ -215,6 +215,130 @@ sudo systemctl reload nginx
 
 ---
 
+## 10. Переход на именной домен (nacpro-web-service.ru)
+
+Если сервис уже работает по IP и нужно перевести его на домен.
+
+### 10.1. DNS
+
+У регистратора домена (или в панели управления DNS) создайте A-записи, указывающие на публичный IP вашей VM (например, 93.77.182.91):
+
+| Тип | Имя (поддомен) | Значение   | TTL (по умолчанию) |
+|-----|----------------|------------|---------------------|
+| A   | `@`            | 93.77.182.91 | 300–3600          |
+| A   | `www`          | 93.77.182.91 | 300–3600          |
+
+- `@` — это сам домен **nacpro-web-service.ru**.
+- `www` — поддомен **www.nacpro-web-service.ru**.
+
+Дождитесь обновления DNS (от нескольких минут до 24–48 часов). Проверка с вашего компьютера:
+
+```bash
+nslookup nacpro-web-service.ru
+nslookup www.nacpro-web-service.ru
+```
+
+Оба должны возвращать IP вашей VM.
+
+### 10.2. ALLOWED_HOSTS (Django)
+
+На VM отредактируйте `.env` и добавьте домены в `ALLOWED_HOSTS` (через запятую, без пробелов):
+
+```bash
+nano /home/mitrist12/tkp_generator/.env
+```
+
+Измените строку, например так:
+
+```
+ALLOWED_HOSTS=93.77.182.91,localhost,127.0.0.1,nacpro-web-service.ru,www.nacpro-web-service.ru
+```
+
+Сохраните файл.
+
+### 10.3. Nginx — привязка к домену
+
+Откройте конфиг сайта:
+
+```bash
+sudo nano /etc/nginx/sites-available/tkp
+```
+
+Замените `server_name _;` на ваши домены:
+
+```nginx
+server {
+    listen 80;
+    server_name nacpro-web-service.ru www.nacpro-web-service.ru;
+
+    location /static/ {
+        alias /home/mitrist12/tkp_generator/staticfiles/;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Проверьте конфиг и перезагрузите Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Перезапустите приложение, чтобы подхватить новый `ALLOWED_HOSTS`:
+
+```bash
+sudo systemctl restart tkp_generator
+```
+
+### 10.4. Проверка по домену
+
+Откройте в браузере:
+
+- `http://nacpro-web-service.ru/`
+- `http://www.nacpro-web-service.ru/`
+
+Оба адреса должны открывать ваш сервис.
+
+### 10.5. HTTPS (опционально)
+
+Чтобы включить шифрование (рекомендуется для продакшена):
+
+1. Установите certbot и плагин для Nginx:
+
+```bash
+sudo apt update
+sudo apt install -y certbot python3-certbot-nginx
+```
+
+2. Выпустите сертификат (certbot сам подставит параметры в конфиг Nginx):
+
+```bash
+sudo certbot --nginx -d nacpro-web-service.ru -d www.nacpro-web-service.ru
+```
+
+Следуйте подсказкам (укажите email, согласитесь с условиями). Certbot настроит редирект HTTP → HTTPS и продление сертификата по таймеру.
+
+3. После успешного выпуска откройте:
+
+- `https://nacpro-web-service.ru/`
+- `https://www.nacpro-web-service.ru/`
+
+Проверка автообновления сертификата:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+---
+
 ## Обновление приложения с GitHub
 
 ### На сервере (Ubuntu / Yandex Cloud VM)
