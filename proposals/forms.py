@@ -108,7 +108,7 @@ SROK_CHOICES = [
 
 
 class ComplexProposalForm(forms.Form):
-    """Форма комплексного ТКП: регион, дата, клиент, срок, опционально text1/text2. Строки передаются отдельно (JSON)."""
+    """Форма комплексного ТКП: регион, дата, клиент, срок, параметры объекта, text1. Строки передаются отдельно (JSON)."""
     region = forms.ModelChoiceField(
         label='Регион',
         queryset=Region.objects.none(),
@@ -123,14 +123,14 @@ class ComplexProposalForm(forms.Form):
     )
     client = forms.CharField(label='Наименование клиента', max_length=255)
     srok = forms.ChoiceField(label='Срок разработки', choices=SROK_CHOICES, required=False)
-    text1 = forms.CharField(
-        label='Доп. текст 1',
+    room = forms.CharField(
+        label='Параметры объекта',
         widget=forms.Textarea(attrs={'rows': 2}),
         required=False,
-        help_text='По желанию. Если пусто — в ТКП не попадает.',
+        help_text='Описание параметров объекта для подстановки в шаблон ТКП.',
     )
-    text2 = forms.CharField(
-        label='Доп. текст 2',
+    text1 = forms.CharField(
+        label='Доп. текст 1',
         widget=forms.Textarea(attrs={'rows': 2}),
         required=False,
         help_text='По желанию. Если пусто — в ТКП не попадает.',

@@ -1,0 +1,21 @@
+{% extends "proposals/base.html" %}
+{% block title %}Редактирование описания услуги{% endblock %}
+{% block content %}
+<h1>Редактирование описания услуги</h1>
+<p class="help" style="margin-bottom: 1rem;">Указанный здесь текст подставляется в поле «Комментарий» при выборе соответствующей услуги в форме «Комплексное ТКП». Вы можете изменить его в самой форме перед отправкой.</p>
+<form method="post" action="{% url 'proposals:service_descriptions' %}">
+    {% csrf_token %}
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+        {% for s in services %}
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: #f9fafb;">
+            <label for="desc-{{ s.id }}" style="font-weight: 600; margin-bottom: 0.35rem; display: block;">{{ s.display_name }}</label>
+            <textarea id="desc-{{ s.id }}" name="desc_{{ s.id }}" rows="3" placeholder="Описание услуги для подстановки в Комментарий" style="margin: 0; width: 100%;">{{ s.description }}</textarea>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="actions" style="margin-top: 1.5rem;">
+        <button type="submit">Сохранить</button>
+        <a href="{% url 'proposals:complex_form' %}" class="btn btn-secondary">К Комплексному ТКП</a>
+    </div>
+</form>
+{% endblock %}

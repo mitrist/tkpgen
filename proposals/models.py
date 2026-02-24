@@ -24,6 +24,11 @@ class Service(models.Model):
     ]
 
     name = models.CharField('Наименование услуги', max_length=255)
+    description = models.TextField(
+        'Описание услуги (подставляется в Комментарий в Комплексном ТКП)',
+        blank=True,
+        default='',
+    )
     template_file = models.CharField(
         'Файл шаблона',
         max_length=255,

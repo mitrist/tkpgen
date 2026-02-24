@@ -10,6 +10,10 @@
     <dd>{{ region_name|default:"—" }}</dd>
     <dt>Наименование клиента</dt>
     <dd>{{ client }}</dd>
+    {% if room %}
+    <dt>Параметры объекта</dt>
+    <dd>{{ room|linebreaksbr }}</dd>
+    {% endif %}
     {% if srok %}
     <dt>Срок разработки</dt>
     <dd>{{ srok }}</dd>
@@ -18,17 +22,14 @@
     <dt>Доп. текст 1</dt>
     <dd>{{ text1|linebreaksbr }}</dd>
     {% endif %}
-    {% if text2 %}
-    <dt>Доп. текст 2</dt>
-    <dd>{{ text2|linebreaksbr }}</dd>
-    {% endif %}
 </dl>
 <div class="complex-table-wrap" style="margin-bottom: 1.5rem;">
     <table class="complex-table" style="width: 100%; border-collapse: collapse;">
         <thead>
             <tr style="border-bottom: 2px solid var(--border);">
                 <th style="text-align: left; padding: 0.5rem;">№</th>
-                <th style="text-align: left; padding: 0.5rem;">Наименование услуги</th>
+                <th style="text-align: left; padding: 0.5rem;">Компонент услуги</th>
+                <th style="text-align: left; padding: 0.5rem;">Комментарий</th>
                 <th style="text-align: left; padding: 0.5rem;">Ед. изм.</th>
                 <th style="text-align: right; padding: 0.5rem;">Количество</th>
                 <th style="text-align: right; padding: 0.5rem;">Цена за ед.</th>
@@ -39,7 +40,8 @@
             {% for r in rows %}
             <tr style="border-bottom: 1px solid var(--border);">
                 <td style="padding: 0.5rem;" data-label="№">{{ r.num }}</td>
-                <td style="padding: 0.5rem;" data-label="Наименование услуги">{{ r.service_name }}</td>
+                <td style="padding: 0.5rem;" data-label="Компонент услуги">{{ r.service_name }}</td>
+                <td style="padding: 0.5rem;" data-label="Комментарий">{{ r.comment|default:"" }}</td>
                 <td style="padding: 0.5rem;" data-label="Ед. изм.">{{ r.unit_display }}</td>
                 <td style="padding: 0.5rem; text-align: right;" data-label="Количество">{{ r.quantity }}</td>
                 <td style="padding: 0.5rem; text-align: right;" data-label="Цена за ед.">{{ r.price_per_unit }} ₽</td>

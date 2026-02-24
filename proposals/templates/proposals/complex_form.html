@@ -13,8 +13,8 @@
         <div>{{ form.srok.label_tag }}{{ form.srok }}</div>
     </div>
     <div style="margin-bottom: 1rem;">
-        <div>{{ form.text1.label_tag }}{{ form.text1 }}{% if form.text1.help_text %}<p class="help">{{ form.text1.help_text }}</p>{% endif %}</div>
-        <div style="margin-top: 0.75rem;">{{ form.text2.label_tag }}{{ form.text2 }}{% if form.text2.help_text %}<p class="help">{{ form.text2.help_text }}</p>{% endif %}</div>
+        <div>{{ form.room.label_tag }}{{ form.room }}{% if form.room.help_text %}<p class="help">{{ form.room.help_text }}</p>{% endif %}</div>
+        <div style="margin-top: 0.75rem;">{{ form.text1.label_tag }}{{ form.text1 }}{% if form.text1.help_text %}<p class="help">{{ form.text1.help_text }}</p>{% endif %}</div>
     </div>
     <p style="font-weight: 600; margin-bottom: 0.5rem;">Позиции ТКП</p>
     <div class="complex-table-wrap" style="margin-bottom: 1rem;">
@@ -22,25 +22,27 @@
             <thead>
                 <tr style="border-bottom: 2px solid var(--border);">
                     <th style="text-align: left; padding: 0.5rem; width: 3rem;">№</th>
-                    <th style="text-align: left; padding: 0.5rem;">Наименование услуги</th>
+                    <th style="text-align: left; padding: 0.5rem;">Компонент услуги</th>
+                    <th style="text-align: left; padding: 0.5rem;">Комментарий</th>
                     <th style="text-align: left; padding: 0.5rem; width: 6rem;">Ед. изм.</th>
-                    <th style="text-align: right; padding: 0.5rem; width: 7rem;">Количество</th>
-                    <th style="text-align: right; padding: 0.5rem; width: 8rem;">Цена за ед.</th>
-                    <th style="text-align: right; padding: 0.5rem; width: 8rem;">Стоимость</th>
+                    <th style="text-align: right; padding: 0.5rem; width: 6rem;">Количество</th>
+                    <th style="text-align: right; padding: 0.5rem; width: 7rem;">Цена за ед.</th>
+                    <th style="text-align: right; padding: 0.5rem; width: 7rem;">Стоимость</th>
                     <th style="width: 3rem;"></th>
                 </tr>
             </thead>
             <tbody id="rows-tbody">
                 <tr class="row-template" data-row="0">
                     <td style="padding: 0.5rem;" class="col-num" data-label="№">1</td>
-                    <td style="padding: 0.25rem;" data-label="Наименование услуги">
+                    <td style="padding: 0.25rem;" data-label="Компонент услуги">
                         <select class="input-service" style="margin: 0; width: 100%;">
                             <option value="">— Выберите услугу —</option>
                             {% for s in services %}
-                            <option value="{{ s.id }}" data-unit="{{ s.unit_type }}">{{ s.name }}</option>
+                            <option value="{{ s.id }}" data-unit="{{ s.unit_type }}">{{ s.display_name }}</option>
                             {% endfor %}
                         </select>
                     </td>
+                    <td style="padding: 0.25rem;" data-label="Комментарий"><input type="text" class="input-comment" placeholder="Комментарий" style="margin: 0; width: 100%;"></td>
                     <td style="padding: 0.25rem;" data-label="Ед. изм.">
                         <select class="input-unit" style="margin: 0; width: 100%;">
                             <option value="m2">м²</option>
@@ -70,6 +72,7 @@
     var regionSelect = document.getElementById('id_region');
     var rowIndex = 1;
     var regionPrices = {{ region_prices_json|safe }};
+    var serviceComments = {{ service_comments_json|safe }};
 
     function parseNum(el) { var v = parseFloat(el.value); return isNaN(v) ? 0 : v; }
     function updateTotal(row) {
@@ -87,10 +90,12 @@
         var serviceSelect = row.querySelector('.input-service');
         var unitSelect = row.querySelector('.input-unit');
         var priceInput = row.querySelector('.input-price');
+        var commentInput = row.querySelector('.input-comment');
         var opt = serviceSelect && serviceSelect.options[serviceSelect.selectedIndex];
         if (!opt || !opt.value) {
             if (unitSelect) unitSelect.value = 'm2';
             if (priceInput) priceInput.value = '0';
+            if (commentInput) commentInput.value = '';
             return;
         }
         var unit = opt.getAttribute('data-unit') || 'm2';
@@ -98,6 +103,9 @@
         var regionId = regionSelect ? regionSelect.value : '';
         if (regionId && regionPrices[regionId] && regionPrices[regionId][opt.value] !== undefined) {
             priceInput.value = regionPrices[regionId][opt.value];
+        }
+        if (commentInput && serviceComments[opt.value] !== undefined) {
+            commentInput.value = serviceComments[opt.value] || '';
         }
         updateTotal(row);
     }
@@ -110,10 +118,11 @@
                 var opt = serviceSelect.options[serviceSelect.selectedIndex];
                 if (opt && opt.value) serviceName = opt.text || '';
             }
+            var comment = (tr.querySelector('.input-comment') || {}).value || '';
             var unit = (tr.querySelector('.input-unit') || {}).value || 'm2';
             var qty = parseNum(tr.querySelector('.input-qty'));
             var price = parseNum(tr.querySelector('.input-price'));
-            rows.push({ service_name: serviceName, unit: unit, quantity: qty, price_per_unit: price });
+            rows.push({ service_name: serviceName, comment: comment, unit: unit, quantity: qty, price_per_unit: price });
         });
         return rows;
     }
@@ -122,8 +131,8 @@
     tbody.addEventListener('input', function(e) {
         if (e.target.matches('.input-qty, .input-price')) {
             updateTotal(e.target.closest('tr'));
-            syncHidden();
         }
+        if (e.target.matches('.input-qty, .input-price, .input-comment')) syncHidden();
     });
     tbody.addEventListener('change', function(e) {
         if (e.target.matches('.input-unit')) { syncHidden(); return; }
@@ -151,6 +160,8 @@
         if (sv) sv.value = '';
         var uv = clone.querySelector('.input-unit');
         if (uv) uv.value = 'm2';
+        var comm = clone.querySelector('.input-comment');
+        if (comm) comm.value = '';
         clone.querySelector('.input-qty').value = '0';
         clone.querySelector('.input-price').value = '0';
         clone.querySelector('.col-total').textContent = '0';

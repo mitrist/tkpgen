@@ -98,6 +98,7 @@
             <a href="{% url 'proposals:complex_form' %}" {% if request.resolver_match.url_name == 'complex_form' or request.resolver_match.url_name == 'complex_confirm' %}class="nav-active"{% endif %}>Комплексное ТКП</a>
             <a href="{% url 'proposals:table' %}" {% if request.resolver_match.url_name == 'table' %}class="nav-active"{% endif %}>Перечень ТКП</a>
             <a href="{% url 'proposals:tariffs' %}" {% if request.resolver_match.url_name == 'tariffs' %}class="nav-active"{% endif %}>Тарифы по регионам</a>
+            <a href="{% url 'proposals:service_descriptions' %}" {% if request.resolver_match.url_name == 'service_descriptions' %}class="nav-active"{% endif %}>Редактирование описания услуги</a>
             <a href="https://www.plksoft.ru" target="_blank" rel="noopener noreferrer">PLK Soft</a>
             <form method="post" action="{% url 'logout' %}" style="margin: 0; padding: 0; display: block;">
                 {% csrf_token %}
@@ -117,6 +118,7 @@
                 <a href="{% url 'proposals:complex_form' %}" {% if request.resolver_match.url_name == 'complex_form' or request.resolver_match.url_name == 'complex_confirm' %}class="nav-active"{% endif %}>Комплексное ТКП</a>
                 <a href="{% url 'proposals:table' %}" {% if request.resolver_match.url_name == 'table' %}class="nav-active"{% endif %}>Перечень ТКП</a>
                 <a href="{% url 'proposals:tariffs' %}" {% if request.resolver_match.url_name == 'tariffs' %}class="nav-active"{% endif %}>Тарифы по регионам</a>
+                <a href="{% url 'proposals:service_descriptions' %}" {% if request.resolver_match.url_name == 'service_descriptions' %}class="nav-active"{% endif %}>Редактирование описания услуги</a>
             </nav>
             <div class="sidebar-footer">
                 <form method="post" action="{% url 'logout' %}" style="margin: 0 0 0.5rem 0; padding: 0;">

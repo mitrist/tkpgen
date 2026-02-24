@@ -24,6 +24,30 @@ from .models import Region, RegionServicePrice, Service, TKPRecord
 COMPLEX_TEMPLATE_NAME = 'Шаблон 9 Комплексное ТКП.docx'
 UNIT_DISPLAY = {'m2': 'м²', 'piece': 'шт'}
 
+# Отображаемые названия услуг в форме «Комплексное ТКП» (колонка «Компонент услуги»)
+COMPLEX_SERVICE_DISPLAY_NAMES = {
+    'ДП': 'Дизайн-проект',
+    'ДКП': 'Дизайн-концепция',
+    'Навигация': 'Навигация',
+    'Контент': 'Контент-система',
+    'Навигация_стенды': 'Контент и навигация',
+    'Фасад': 'Дизайн-проект Фасада',
+    'ДК Фасад': 'Дизайн-концепция Фасада',
+    'Благоустройство': 'Благоустройство',
+}
+
+# Комментарий по умолчанию при выборе услуги в строке комплексного ТКП (можно редактировать в форме)
+COMPLEX_SERVICE_DEFAULT_COMMENTS = {
+    'ДП': 'Разработка дизайн-проекта в соответствии с техническим заданием.',
+    'ДКП': 'Разработка дизайн-концепции.',
+    'Навигация': 'Разработка навигационной системы.',
+    'Контент': 'Разработка контент-системы.',
+    'Навигация_стенды': 'Контент и навигация для стендов.',
+    'Фасад': 'Дизайн-проект фасада.',
+    'ДК Фасад': 'Дизайн-концепция фасада.',
+    'Благоустройство': 'Проектирование благоустройства территории.',
+}
+
 
 def _get_libreoffice_path():
     """Путь к LibreOffice: на Windows ищем soffice.exe в стандартных каталогах."""
@@ -42,6 +66,11 @@ def _convert_docx_to_pdf(docx_path, out_dir):
     out_dir = Path(out_dir)
     cmd = _get_libreoffice_path()
     if sys.platform == 'win32' and cmd == 'libreoffice':
+        try:
+            import pythoncom
+            pythoncom.CoInitialize()
+        except ImportError:
+            pass
         try:
             from docx2pdf import convert as docx2pdf_convert
             docx2pdf_convert(str(docx_path), str(out_dir / 'tkp.pdf'))
@@ -228,7 +257,7 @@ def _parse_complex_rows(rows_data):
     """
     Валидация и разбор строк комплексного ТКП из JSON.
     Возвращает (list of dicts, error_message).
-    Каждый dict: service_name, unit, quantity, price_per_unit, total (Decimal).
+    Каждый dict: service_name, comment, unit, quantity, price_per_unit, total (Decimal).
     """
     if not rows_data:
         return [], 'Добавьте хотя бы одну строку'
@@ -243,6 +272,7 @@ def _parse_complex_rows(rows_data):
         if not isinstance(r, dict):
             continue
         name = (r.get('service_name') or '').strip()
+        comment = (r.get('comment') or '').strip()
         unit = (r.get('unit') or 'm2').strip() in ('piece', 'шт') and 'piece' or 'm2'
         try:
             qty = Decimal(str(r.get('quantity') or 0))
@@ -254,13 +284,14 @@ def _parse_complex_rows(rows_data):
         total = (qty * price).quantize(Decimal('0.01'))
         result.append({
             'service_name': name or f'Позиция {i + 1}',
+            'comment': comment,
             'unit': unit,
             'quantity': qty,
             'price_per_unit': price,
             'total': total,
         })
     if not result:
-        return [], 'Заполните хотя бы одну строку (наименование, количество, цена)'
+        return [], 'Заполните хотя бы одну строку (компонент услуги, количество, цена)'
     return result, None
 
 
@@ -277,6 +308,7 @@ def complex_form_view(request):
             rows_serializable = [
                 {
                     'service_name': r['service_name'],
+                    'comment': r.get('comment', ''),
                     'unit': r['unit'],
                     'quantity': str(r['quantity']),
                     'price_per_unit': str(r['price_per_unit']),
@@ -291,9 +323,9 @@ def complex_form_view(request):
                 'region_id': region.pk,
                 'region_name': region.name,
                 'srok': form.cleaned_data.get('srok') or '',
+                'room': (form.cleaned_data.get('room') or '').strip(),
                 'rows': rows_serializable,
                 'text1': (form.cleaned_data.get('text1') or '').strip(),
-                'text2': (form.cleaned_data.get('text2') or '').strip(),
             }
             request.session['complex_proposal_data'] = data
             return redirect('proposals:complex_confirm')
@@ -301,7 +333,20 @@ def complex_form_view(request):
             messages.error(request, row_error)
     else:
         form = ComplexProposalForm()
-    services = list(Service.objects.order_by('order', 'name').values('id', 'name', 'unit_type'))
+    services_raw = list(Service.objects.order_by('order', 'name').values('id', 'name', 'unit_type', 'description'))
+    services = []
+    for s in services_raw:
+        name = s['name']
+        display_name = COMPLEX_SERVICE_DISPLAY_NAMES.get(name, name)
+        saved_desc = (s.get('description') or '').strip()
+        default_comment = saved_desc if saved_desc else COMPLEX_SERVICE_DEFAULT_COMMENTS.get(name, '')
+        services.append({
+            'id': s['id'],
+            'name': name,
+            'display_name': display_name,
+            'unit_type': s['unit_type'],
+            'default_comment': default_comment,
+        })
     prices_qs = RegionServicePrice.objects.select_related('region', 'service').all()
     region_prices = {}
     for rsp in prices_qs:
@@ -309,11 +354,13 @@ def complex_form_view(request):
         if rid not in region_prices:
             region_prices[rid] = {}
         region_prices[rid][sid] = str(rsp.unit_price)
+    service_comments = {str(s['id']): s['default_comment'] for s in services}
     context = {
         'form': form,
         'services': services,
         'services_json': json.dumps(services, ensure_ascii=False),
         'region_prices_json': json.dumps(region_prices, ensure_ascii=False),
+        'service_comments_json': json.dumps(service_comments, ensure_ascii=False),
     }
     return render(request, 'proposals/complex_form.html', context)
 
@@ -346,6 +393,7 @@ def complex_confirm_view(request):
         rows_display.append({
             'num': i,
             'service_name': r['service_name'],
+            'comment': r.get('comment', ''),
             'unit_display': UNIT_DISPLAY.get(r['unit'], r['unit']),
             'quantity': r['quantity'],
             'price_per_unit': r['price_per_unit'],
@@ -356,10 +404,10 @@ def complex_confirm_view(request):
         'client': data['client'],
         'region_name': data.get('region_name', ''),
         'srok': data.get('srok', ''),
+        'room': data.get('room', ''),
         'rows': rows_display,
         'total_sum': _format_price(total_sum),
         'text1': data.get('text1', ''),
-        'text2': data.get('text2', ''),
     }
     return render(request, 'proposals/complex_confirm.html', context)
 
@@ -390,10 +438,10 @@ def _build_complex_table_document(rows_ctx, total_sum_formatted):
     """Создаёт Document с одной таблицей позиций (для вставки в основной docx)."""
     from docx import Document
     doc = Document()
-    table = doc.add_table(rows=len(rows_ctx) + 2, cols=6)  # заголовок + строки + итого
+    table = doc.add_table(rows=len(rows_ctx) + 2, cols=7)  # заголовок + строки + итого
     _set_table_borders(table)
     header = table.rows[0].cells
-    headers_text = ('№', 'Наименование услуги', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Стоимость')
+    headers_text = ('№', 'Компонент услуги', 'Комментарий', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Стоимость')
     for i, text in enumerate(headers_text):
         header[i].text = text
         for run in header[i].paragraphs[0].runs:
@@ -402,12 +450,13 @@ def _build_complex_table_document(rows_ctx, total_sum_formatted):
         row_cells = table.rows[i].cells
         row_cells[0].text = str(r['num'])
         row_cells[1].text = r['service_name']
-        row_cells[2].text = r['unit_display']
-        row_cells[3].text = r['quantity']
-        row_cells[4].text = r['price_per_unit']
-        row_cells[5].text = r['total_formatted']
+        row_cells[2].text = r.get('comment', '')
+        row_cells[3].text = r['unit_display']
+        row_cells[4].text = r['quantity']
+        row_cells[5].text = r['price_per_unit']
+        row_cells[6].text = r['total_formatted']
     last = table.rows[len(rows_ctx) + 1].cells
-    last[0].merge(last[5])
+    last[0].merge(last[6])
     last[0].text = f"Итого: {total_sum_formatted} ₽"
     return doc
 
@@ -448,6 +497,7 @@ def _generate_complex_and_save_files(data):
         rows_ctx.append({
             'num': i,
             'service_name': r['service_name'],
+            'comment': r.get('comment', ''),
             'unit_display': UNIT_DISPLAY.get(r['unit'], r['unit']),
             'quantity': str(r['quantity']),
             'price_per_unit': _format_price(Decimal(str(r['price_per_unit']))),
@@ -455,13 +505,13 @@ def _generate_complex_and_save_files(data):
         })
 
     default_row = {
-        'num': '', 'service_name': '', 'unit_display': '',
+        'num': '', 'service_name': '', 'comment': '', 'unit_display': '',
         'quantity': '', 'price_per_unit': '', 'total_formatted': '',
     }
-    # text1, text2 — опционально; в шаблоне {{ text1 }} / {{ text2 }} (пустые не выводятся)
     context = {
         'date': date_display,
         'client': data['client'],
+        'room': data.get('room', ''),
         'srok': data.get('srok', ''),
         'number': number,
         'total_sum_formatted': total_sum_formatted,
@@ -469,7 +519,6 @@ def _generate_complex_and_save_files(data):
         'rows': rows_ctx,
         'rows_table_placeholder': TKP_TABLE_PLACEHOLDER,
         'text1': data.get('text1') or '',
-        'text2': data.get('text2') or '',
     }
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -623,6 +672,33 @@ def tariffs_view(request):
     tariffs_list = RegionServicePrice.objects.select_related('region', 'service').order_by('region__name', 'service__name')
     context = {'form': form, 'tariffs_list': tariffs_list}
     return render(request, 'proposals/tariffs.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def service_descriptions_view(request):
+    """Редактирование описаний услуг. Описание подставляется в поле «Комментарий» в Комплексном ТКП."""
+    services_qs = Service.objects.order_by('order', 'name')
+    if request.method == 'POST':
+        for service in services_qs:
+            key = f'desc_{service.id}'
+            new_desc = (request.POST.get(key) or '').strip()
+            if service.description != new_desc:
+                service.description = new_desc
+                service.save(update_fields=['description'])
+        messages.success(request, 'Описания услуг сохранены.')
+        return redirect('proposals:service_descriptions')
+    services = []
+    for s in services_qs:
+        display_name = COMPLEX_SERVICE_DISPLAY_NAMES.get(s.name, s.name)
+        services.append({
+            'id': s.id,
+            'name': s.name,
+            'display_name': display_name,
+            'description': s.description or '',
+        })
+    context = {'services': services}
+    return render(request, 'proposals/service_descriptions.html', context)
 
 
 def _generate_doc_number(client, date_obj, seq):
