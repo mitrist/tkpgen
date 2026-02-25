@@ -14,10 +14,6 @@
     <dt>Параметры объекта</dt>
     <dd>{{ room|linebreaksbr }}</dd>
     {% endif %}
-    {% if srok %}
-    <dt>Срок разработки</dt>
-    <dd>{{ srok }}</dd>
-    {% endif %}
     {% if text1 %}
     <dt>Доп. текст 1</dt>
     <dd>{{ text1|linebreaksbr }}</dd>
@@ -41,7 +37,7 @@
             <tr style="border-bottom: 1px solid var(--border);">
                 <td style="padding: 0.5rem;" data-label="№">{{ r.num }}</td>
                 <td style="padding: 0.5rem;" data-label="Компонент услуги">{{ r.service_name }}</td>
-                <td style="padding: 0.5rem;" data-label="Комментарий">{{ r.comment|default:"" }}</td>
+                <td style="padding: 0.5rem;" data-label="Комментарий">{{ r.comment|default:""|linebreaksbr }}</td>
                 <td style="padding: 0.5rem;" data-label="Ед. изм.">{{ r.unit_display }}</td>
                 <td style="padding: 0.5rem; text-align: right;" data-label="Количество">{{ r.quantity }}</td>
                 <td style="padding: 0.5rem; text-align: right;" data-label="Цена за ед.">{{ r.price_per_unit }} ₽</td>

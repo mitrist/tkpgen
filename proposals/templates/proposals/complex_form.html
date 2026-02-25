@@ -10,7 +10,6 @@
         <div>{{ form.region.label_tag }}{{ form.region }}{% if form.region.help_text %}<p class="help">{{ form.region.help_text }}</p>{% endif %}</div>
         <div>{{ form.date.label_tag }}{{ form.date }}</div>
         <div>{{ form.client.label_tag }}{{ form.client }}</div>
-        <div>{{ form.srok.label_tag }}{{ form.srok }}</div>
     </div>
     <div style="margin-bottom: 1rem;">
         <div>{{ form.room.label_tag }}{{ form.room }}{% if form.room.help_text %}<p class="help">{{ form.room.help_text }}</p>{% endif %}</div>
@@ -22,6 +21,7 @@
             <colgroup>
                 <col style="width: 12rem;">
                 <col style="width: 30%;">
+                <col style="width: 11rem;">
                 <col style="width: 5.5rem;">
                 <col style="width: 5.5rem;">
                 <col style="width: 6.5rem;">
@@ -32,6 +32,7 @@
                 <tr style="border-bottom: 2px solid var(--border);">
                     <th style="text-align: left; padding: 0.5rem;">Компонент услуги</th>
                     <th style="text-align: left; padding: 0.5rem;">Комментарий</th>
+                    <th style="text-align: left; padding: 0.5rem;">Срок разработки</th>
                     <th style="text-align: left; padding: 0.5rem;">Ед. изм.</th>
                     <th style="text-align: right; padding: 0.5rem;">Количество</th>
                     <th style="text-align: right; padding: 0.5rem;">Цена за ед.</th>
@@ -49,7 +50,14 @@
                             {% endfor %}
                         </select>
                     </td>
-                    <td style="padding: 0.25rem;" data-label="Комментарий"><input type="text" class="input-comment" placeholder="Комментарий" style="margin: 0; width: 100%;"></td>
+                    <td style="padding: 0.25rem;" data-label="Комментарий"><input type="text" class="input-comment" placeholder="Комментарий. Для переноса строки введите |" style="margin: 0; width: 100%;" title="Символ | (вертикальная черта) — перенос строки в ТКП"></td>
+                    <td style="padding: 0.25rem;" data-label="Срок разработки">
+                        <select class="input-srok" style="margin: 0; width: 100%;">
+                            {% for value, label in srok_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
                     <td style="padding: 0.25rem;" data-label="Ед. изм.">
                         <select class="input-unit" style="margin: 0; width: 100%;">
                             <option value="m2">м²</option>
@@ -121,10 +129,12 @@
                 if (opt && opt.value) serviceName = opt.text || '';
             }
             var comment = (tr.querySelector('.input-comment') || {}).value || '';
+            var srokEl = tr.querySelector('.input-srok');
+            var srok = srokEl ? srokEl.value : '';
             var unit = (tr.querySelector('.input-unit') || {}).value || 'm2';
             var qty = parseNum(tr.querySelector('.input-qty'));
             var price = parseNum(tr.querySelector('.input-price'));
-            rows.push({ service_name: serviceName, comment: comment, unit: unit, quantity: qty, price_per_unit: price });
+            rows.push({ service_name: serviceName, comment: comment, srok: srok, unit: unit, quantity: qty, price_per_unit: price });
         });
         return rows;
     }
@@ -134,10 +144,10 @@
         if (e.target.matches('.input-qty, .input-price')) {
             updateTotal(e.target.closest('tr'));
         }
-        if (e.target.matches('.input-qty, .input-price, .input-comment')) syncHidden();
+        if (e.target.matches('.input-qty, .input-price, .input-comment, .input-srok')) syncHidden();
     });
     tbody.addEventListener('change', function(e) {
-        if (e.target.matches('.input-unit')) { syncHidden(); return; }
+        if (e.target.matches('.input-unit, .input-srok')) { syncHidden(); return; }
         if (e.target.matches('.input-service')) {
             applyServiceAndPrice(e.target.closest('tr'));
             syncHidden();
@@ -164,6 +174,8 @@
         if (uv) uv.value = 'm2';
         var comm = clone.querySelector('.input-comment');
         if (comm) comm.value = '';
+        var srokSel = clone.querySelector('.input-srok');
+        if (srokSel) srokSel.selectedIndex = 0;
         clone.querySelector('.input-qty').value = '0';
         clone.querySelector('.input-price').value = '0';
         clone.querySelector('.col-total').textContent = '0';

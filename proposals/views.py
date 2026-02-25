@@ -18,7 +18,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from docxtpl import DocxTemplate
 
-from .forms import ComplexProposalForm, ProposalForm, RequisitesParseForm, TariffForm
+from .forms import ComplexProposalForm, ProposalForm, RequisitesParseForm, SROK_CHOICES, TariffForm
 from .models import Region, RegionServicePrice, Service, TKPRecord
 from .requisites_parser import FIELD_ORDER, parse_requisites_file
 
@@ -37,7 +37,10 @@ COMPLEX_SERVICE_DISPLAY_NAMES = {
     'Благоустройство': 'Благоустройство',
 }
 
-# Комментарий по умолчанию при выборе услуги в строке комплексного ТКП (можно редактировать в форме)
+# Символ в тексте комментария, по которому делается перенос строки в ТКП и на странице подтверждения
+COMPLEX_COMMENT_LINE_BREAK_MARKER = '|'
+
+# Комментарий по умолчанию (fallback, если нет в БД и нет в data/complex_service_comments.json)
 COMPLEX_SERVICE_DEFAULT_COMMENTS = {
     'ДП': 'Разработка дизайн-проекта в соответствии с техническим заданием.',
     'ДКП': 'Разработка дизайн-концепции.',
@@ -48,6 +51,29 @@ COMPLEX_SERVICE_DEFAULT_COMMENTS = {
     'ДК Фасад': 'Дизайн-концепция фасада.',
     'Благоустройство': 'Проектирование благоустройства территории.',
 }
+
+COMPLEX_SERVICE_COMMENTS_FILE = 'data/complex_service_comments.json'
+
+
+def _load_complex_service_comments_file():
+    """Загружает комментарии по умолчанию из файла в папке проекта (для деплоя без ручного ввода)."""
+    path = Path(settings.BASE_DIR) / COMPLEX_SERVICE_COMMENTS_FILE
+    if not path.exists():
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_complex_service_comments_file(comments_by_name):
+    """Сохраняет комментарии в data/complex_service_comments.json (чтобы при деплое не вводить заново)."""
+    path = Path(settings.BASE_DIR) / COMPLEX_SERVICE_COMMENTS_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(comments_by_name, f, ensure_ascii=False, indent=2)
 
 
 def _get_libreoffice_path():
@@ -274,6 +300,7 @@ def _parse_complex_rows(rows_data):
             continue
         name = (r.get('service_name') or '').strip()
         comment = (r.get('comment') or '').strip()
+        srok = (r.get('srok') or '').strip()
         unit = (r.get('unit') or 'm2').strip() in ('piece', 'шт') and 'piece' or 'm2'
         try:
             qty = Decimal(str(r.get('quantity') or 0))
@@ -286,6 +313,7 @@ def _parse_complex_rows(rows_data):
         result.append({
             'service_name': name or f'Позиция {i + 1}',
             'comment': comment,
+            'srok': srok,
             'unit': unit,
             'quantity': qty,
             'price_per_unit': price,
@@ -310,6 +338,7 @@ def complex_form_view(request):
                 {
                     'service_name': r['service_name'],
                     'comment': r.get('comment', ''),
+                    'srok': r.get('srok', ''),
                     'unit': r['unit'],
                     'quantity': str(r['quantity']),
                     'price_per_unit': str(r['price_per_unit']),
@@ -323,7 +352,6 @@ def complex_form_view(request):
                 'client': (form.cleaned_data['client'] or '').strip(),
                 'region_id': region.pk,
                 'region_name': region.name,
-                'srok': form.cleaned_data.get('srok') or '',
                 'room': (form.cleaned_data.get('room') or '').strip(),
                 'rows': rows_serializable,
                 'text1': (form.cleaned_data.get('text1') or '').strip(),
@@ -336,11 +364,16 @@ def complex_form_view(request):
         form = ComplexProposalForm()
     services_raw = list(Service.objects.order_by('order', 'name').values('id', 'name', 'unit_type', 'description'))
     services = []
+    file_comments = _load_complex_service_comments_file()
     for s in services_raw:
         name = s['name']
         display_name = COMPLEX_SERVICE_DISPLAY_NAMES.get(name, name)
         saved_desc = (s.get('description') or '').strip()
-        default_comment = saved_desc if saved_desc else COMPLEX_SERVICE_DEFAULT_COMMENTS.get(name, '')
+        default_comment = (
+            saved_desc
+            or file_comments.get(name, '')
+            or COMPLEX_SERVICE_DEFAULT_COMMENTS.get(name, '')
+        )
         services.append({
             'id': s['id'],
             'name': name,
@@ -359,6 +392,7 @@ def complex_form_view(request):
     context = {
         'form': form,
         'services': services,
+        'srok_choices': SROK_CHOICES,
         'services_json': json.dumps(services, ensure_ascii=False),
         'region_prices_json': json.dumps(region_prices, ensure_ascii=False),
         'service_comments_json': json.dumps(service_comments, ensure_ascii=False),
@@ -391,10 +425,14 @@ def complex_confirm_view(request):
     total_sum = sum(Decimal(str(r['total'])) for r in data['rows'])
     rows_display = []
     for i, r in enumerate(data['rows'], 1):
+        comment = (r.get('comment') or '').replace(COMPLEX_COMMENT_LINE_BREAK_MARKER, '\n')
+        srok = r.get('srok', '')
+        if srok:
+            comment = comment.rstrip() + '\nСрок разработки - ' + srok
         rows_display.append({
             'num': i,
             'service_name': r['service_name'],
-            'comment': r.get('comment', ''),
+            'comment': comment,
             'unit_display': UNIT_DISPLAY.get(r['unit'], r['unit']),
             'quantity': r['quantity'],
             'price_per_unit': r['price_per_unit'],
@@ -404,7 +442,6 @@ def complex_confirm_view(request):
         'date': date_display,
         'client': data['client'],
         'region_name': data.get('region_name', ''),
-        'srok': data.get('srok', ''),
         'room': data.get('room', ''),
         'rows': rows_display,
         'total_sum': _format_price(total_sum),
@@ -435,9 +472,61 @@ def _set_table_borders(table, sz='4', val='single', color='000000'):
         el.set(qn('w:color'), color)
 
 
+def _set_cell_font(cell, font_name='Montserrat'):
+    """Устанавливает шрифт для всех run в ячейке."""
+    for paragraph in cell.paragraphs:
+        for run in paragraph.runs:
+            run.font.name = font_name
+
+
+def _set_cell_text_with_breaks_and_font(cell, text, font_name='Montserrat'):
+    """Заполняет ячейку текстом с сохранением переносов строк, шрифт Montserrat."""
+    from docx.enum.text import WD_BREAK
+    paragraph = cell.paragraphs[0]
+    paragraph.clear()
+    if not text:
+        _set_cell_font(cell, font_name)
+        return
+    lines = text.split('\n')
+    for i, line in enumerate(lines):
+        run = paragraph.add_run(line)
+        run.font.name = font_name
+        if i < len(lines) - 1:
+            run.add_break(WD_BREAK.LINE)
+    _set_cell_font(cell, font_name)
+
+
+def _set_cell_comment_with_srok(cell, comment, srok, font_name='Montserrat'):
+    """Ячейка «Комментарий»: текст с переносами (Montserrat), затем с новой строки жирная «Срок разработки - {srok}».
+    Переносы: символ COMPLEX_COMMENT_LINE_BREAK_MARKER и реальные \\n заменяются на новую строку."""
+    from docx.enum.text import WD_BREAK
+    paragraph = cell.paragraphs[0]
+    paragraph.clear()
+    comment = (comment or '').strip().replace(COMPLEX_COMMENT_LINE_BREAK_MARKER, '\n')
+    srok = (srok or '').strip()
+    if comment:
+        lines = comment.split('\n')
+        for i, line in enumerate(lines):
+            run = paragraph.add_run(line)
+            run.font.name = font_name
+            if i < len(lines) - 1:
+                run.add_break(WD_BREAK.LINE)
+    if srok:
+        if comment:
+            run = paragraph.add_run()
+            run.add_break(WD_BREAK.LINE)
+        run = paragraph.add_run('Срок разработки - ' + srok)
+        run.font.name = font_name
+        run.bold = True
+    if not comment and not srok:
+        _set_cell_font(cell, font_name)
+    else:
+        _set_cell_font(cell, font_name)
+
+
 def _build_complex_table_document(rows_ctx, total_sum_formatted):
     """Создаёт Document с одной таблицей позиций (для вставки в основной docx). Без колонки №.
-    Ширины задаются и в ячейках (Word), и в tblGrid (LibreOffice)."""
+    Ширины задаются и в ячейках (Word), и в tblGrid (LibreOffice). Шрифт таблицы — Montserrat."""
     from docx import Document
     from docx.oxml.ns import qn
     from docx.shared import Inches
@@ -468,17 +557,21 @@ def _build_complex_table_document(rows_ctx, total_sum_formatted):
         header[i].text = text
         for run in header[i].paragraphs[0].runs:
             run.bold = True
+            run.font.name = 'Montserrat'
     for i, r in enumerate(rows_ctx, 1):
         row_cells = table.rows[i].cells
         row_cells[0].text = r['service_name']
-        row_cells[1].text = r.get('comment', '')
+        _set_cell_comment_with_srok(row_cells[1], r.get('comment', ''), r.get('srok', ''))
         row_cells[2].text = r['unit_display']
         row_cells[3].text = r['quantity']
         row_cells[4].text = r['price_per_unit']
         row_cells[5].text = r['total_formatted']
+        for col_idx in (0, 2, 3, 4, 5):
+            _set_cell_font(row_cells[col_idx])
     last = table.rows[len(rows_ctx) + 1].cells
     last[0].merge(last[5])
     last[0].text = f"Итого: {total_sum_formatted} ₽"
+    _set_cell_font(last[0])
     return doc
 
 
@@ -519,6 +612,7 @@ def _generate_complex_and_save_files(data):
             'num': i,
             'service_name': r['service_name'],
             'comment': r.get('comment', ''),
+            'srok': r.get('srok', ''),
             'unit_display': UNIT_DISPLAY.get(r['unit'], r['unit']),
             'quantity': str(r['quantity']),
             'price_per_unit': _format_price(Decimal(str(r['price_per_unit']))),
@@ -707,16 +801,27 @@ def service_descriptions_view(request):
             if service.description != new_desc:
                 service.description = new_desc
                 service.save(update_fields=['description'])
+        # Сохраняем в файл, чтобы при деплое не вводить комментарии заново
+        try:
+            updated = Service.objects.order_by('order', 'name').values('name', 'description')
+            comments_by_name = {s['name']: (s['description'] or '') for s in updated}
+            _save_complex_service_comments_file(comments_by_name)
+        except Exception:
+            pass
         messages.success(request, 'Описания услуг сохранены.')
         return redirect('proposals:service_descriptions')
+    file_comments = _load_complex_service_comments_file()
     services = []
     for s in services_qs:
         display_name = COMPLEX_SERVICE_DISPLAY_NAMES.get(s.name, s.name)
+        desc = (s.description or '').strip()
+        if not desc:
+            desc = file_comments.get(s.name, '')
         services.append({
             'id': s.id,
             'name': s.name,
             'display_name': display_name,
-            'description': s.description or '',
+            'description': desc,
         })
     context = {'services': services}
     return render(request, 'proposals/service_descriptions.html', context)

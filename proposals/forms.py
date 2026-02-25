@@ -122,7 +122,6 @@ class ComplexProposalForm(forms.Form):
         input_formats=['%Y-%m-%d']
     )
     client = forms.CharField(label='Наименование клиента', max_length=255)
-    srok = forms.ChoiceField(label='Срок разработки', choices=SROK_CHOICES, required=False)
     room = forms.CharField(
         label='Параметры объекта',
         widget=forms.Textarea(attrs={'rows': 2}),
