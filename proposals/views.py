@@ -18,8 +18,9 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from docxtpl import DocxTemplate
 
-from .forms import ComplexProposalForm, ProposalForm, TariffForm
+from .forms import ComplexProposalForm, ProposalForm, RequisitesParseForm, TariffForm
 from .models import Region, RegionServicePrice, Service, TKPRecord
+from .requisites_parser import FIELD_ORDER, parse_requisites_file
 
 COMPLEX_TEMPLATE_NAME = 'Шаблон 9 Комплексное ТКП.docx'
 UNIT_DISPLAY = {'m2': 'м²', 'piece': 'шт'}
@@ -719,6 +720,56 @@ def service_descriptions_view(request):
         })
     context = {'services': services}
     return render(request, 'proposals/service_descriptions.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def requisites_add_view(request):
+    """Загрузка карточки контрагента, извлечение реквизитов и формирование пользовательской карточки."""
+    form = RequisitesParseForm()
+    card_data = None
+
+    if request.method == 'POST':
+        action = (request.POST.get('action') or '').strip()
+        form = RequisitesParseForm(request.POST, request.FILES)
+
+        if action == 'parse':
+            source_file = request.FILES.get('source_file')
+            if not source_file:
+                form.add_error('source_file', 'Выберите файл для извлечения реквизитов.')
+            elif form.is_valid():
+                try:
+                    parsed = parse_requisites_file(source_file.name, source_file.read())
+                except ValueError as exc:
+                    messages.error(request, str(exc))
+                except Exception:
+                    messages.error(
+                        request,
+                        'Не удалось обработать файл. Проверьте, что это корректный DOCX/PDF с текстом.',
+                    )
+                else:
+                    merged = {}
+                    for field in FIELD_ORDER:
+                        parsed_value = (parsed.get(field) or '').strip()
+                        manual_value = (form.cleaned_data.get(field) or '').strip()
+                        merged[field] = parsed_value or manual_value
+                    form = RequisitesParseForm(initial=merged)
+                    messages.success(request, 'Реквизиты извлечены. Проверьте и при необходимости отредактируйте.')
+
+        elif action == 'build':
+            if form.is_valid():
+                card_data = {field: (form.cleaned_data.get(field) or '').strip() for field in FIELD_ORDER}
+                if not any(card_data.values()):
+                    form.add_error(None, 'Заполните хотя бы одно поле реквизитов, чтобы сформировать карточку.')
+                    card_data = None
+            else:
+                messages.error(request, 'Проверьте корректность заполнения полей.')
+
+    context = {
+        'form': form,
+        'card_data': card_data,
+    }
+    return render(request, 'proposals/requisites_form.html', context)
 
 
 def _generate_doc_number(client, date_obj, seq):

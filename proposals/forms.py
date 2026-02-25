@@ -179,3 +179,25 @@ class TariffForm(forms.Form):
         if not region and not new_name:
             self.add_error('new_region_name', 'Выберите регион или введите название нового')
         return data
+
+
+class RequisitesParseForm(forms.Form):
+    """Загрузка файла реквизитов и редактирование извлечённых полей."""
+    source_file = forms.FileField(
+        label='Файл с реквизитами (.docx/.pdf)',
+        required=False,
+        help_text='Поддерживаются DOCX и PDF.',
+    )
+    name = forms.CharField(label='Наименование', max_length=500, required=False)
+    inn = forms.CharField(label='ИНН', max_length=12, required=False)
+    address = forms.CharField(
+        label='Адрес',
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+    )
+    director = forms.CharField(label='Генеральный директор', max_length=255, required=False)
+    ogrn = forms.CharField(label='ОГРН', max_length=15, required=False)
+    account = forms.CharField(label='Расчетный счет (р/сч)', max_length=64, required=False)
+    bank = forms.CharField(label='Наименование банка (Банк)', max_length=500, required=False)
+    bik = forms.CharField(label='БИК', max_length=9, required=False)
+    phone = forms.CharField(label='Телефон', max_length=64, required=False)
