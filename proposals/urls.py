@@ -5,7 +5,10 @@ app_name = 'proposals'
 
 urlpatterns = [
     path('table/', views.table_view, name='table'),
+    path('contracts/', views.contract_table_view, name='contract_table'),
     path('contract/<int:tkp_id>/', views.contract_form_view, name='contract_form'),
+    path('contract/<int:contract_id>/card/', views.contract_card_view, name='contract_card'),
+    path('contract/<int:contract_id>/download/<str:file_type>/', views.contract_download_file_view, name='contract_download'),
     path('tariffs/', views.tariffs_view, name='tariffs'),
     path('service-descriptions/', views.service_descriptions_view, name='service_descriptions'),
     path('requisites/', views.requisites_add_view, name='requisites_add'),

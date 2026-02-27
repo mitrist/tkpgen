@@ -52,6 +52,7 @@
     {% csrf_token %}
     <div class="actions">
         <button type="submit">Подтвердить и сформировать ТКП</button>
+        <button type="submit" name="save_draft" value="1" class="btn btn-secondary">Сохранить как черновик</button>
         <a href="{% url 'proposals:complex_form' %}" class="btn btn-secondary">Вернуться к форме</a>
     </div>
 </form>

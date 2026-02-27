@@ -1,0 +1,58 @@
+{% extends "proposals/base.html" %}
+{% load proposal_filters %}
+{% block title %}Реестр договоров{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<div style="overflow-x: auto;">
+<h1>Реестр договоров</h1>
+<table class="table-contract-list" style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8125rem;">
+    <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер документа</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
+            <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in records %}
+        <tr style="border-bottom: 1px solid var(--border);" class="{% if r.status == 'draft' %}contract-row-draft{% endif %}">
+            <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">
+                {% if r.status == 'draft' and r.tkp_id %}
+                <a href="{% url 'proposals:contract_form' r.tkp_id %}">{{ r.number }}</a>
+                {% else %}
+                {{ r.number }}
+                {% endif %}
+            </td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.service|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+            <td style="padding: 0.4rem 0.5rem;">
+                {% if r.docx_file and r.pdf_file %}
+                <a href="{% url 'proposals:contract_download' r.pk 'docx' %}" class="table-file-link">.docx</a>
+                <a href="{% url 'proposals:contract_download' r.pk 'pdf' %}" class="table-file-link">.pdf</a>
+                {% else %}
+                —
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет договоров</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p style="margin-top: 1.5rem;">
+    <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К реестру ТКП</a>
+</p>
+</div>
+<style>
+.table-file-link { margin-right: 0.5rem; }
+.table-file-link:last-of-type { margin-right: 0; }
+.contract-row-draft { background-color: #fffde7; }
+</style>
+{% endblock %}

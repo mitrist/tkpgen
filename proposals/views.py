@@ -139,9 +139,14 @@ def _get_next_seq_for_date(date_obj):
 
 
 def _get_next_contract_seq_for_date(date_obj):
-    """Порядковый номер договора за указанную дату (текущая дата_порядковый номер)."""
+    """Порядковый номер договора за указанную дату (дата_порядковый). Учитываются все записи за дату (в т.ч. черновики), чтобы номер был уникальным."""
     count = ContractRecord.objects.filter(date=date_obj).count()
     return count + 1
+
+
+def _get_next_contract_draft_seq_for_date(date_obj):
+    """Порядковый номер черновика договора за дату."""
+    return ContractRecord.objects.filter(date=date_obj, status=ContractRecord.STATUS_DRAFT).count() + 1
 
 
 def _format_price(value):
@@ -159,55 +164,164 @@ def _format_price(value):
     return result
 
 
+def _build_proposal_data_from_form_cleaned(data):
+    """Собрать proposal_data из очищенных данных формы (полная валидация уже пройдена)."""
+    service = data['service']
+    s = data.get('s') or 0
+    if data.get('is_internal'):
+        price_value = data.get('internal_price') or 0
+        region_name = ''
+    else:
+        region = data['region']
+        try:
+            rsp = RegionServicePrice.objects.get(region=region, service=service)
+            price_value = float(rsp.unit_price) * float(s)
+        except RegionServicePrice.DoesNotExist:
+            return None, f'Не найдена цена для региона "{region.name}" и услуги "{service.name}".'
+        region_name = region.name
+    client_value = (
+        (data.get('internal_client') or '').strip()
+        if data.get('is_internal')
+        else (data.get('client') or '')
+    )
+    return {
+        'date': data['date'].strftime('%Y-%m-%d'),
+        'service_id': service.pk,
+        'service_name': service.name,
+        'city': region_name,
+        'price': str(price_value),
+        'client': client_value,
+        'room': data.get('room') or '',
+        'srok': data.get('srok') or '',
+        'text': data.get('text') or '',
+        's': '' if data.get('is_internal') else str(s),
+    }, None
+
+
 @login_required
 @require_http_methods(['GET', 'POST'])
 def form_view(request):
-    """Шаг 1: форма ввода параметров ТКП."""
+    """Шаг 1: форма ввода параметров ТКП. GET ?draft_id= — возобновление черновика (простое ТКП)."""
     if request.method == 'POST':
         form = ProposalForm(request.POST)
-        if form.is_valid():
-            data = form.cleaned_data
-            service = data['service']
-            s = data.get('s') or 0
-            if data.get('is_internal'):
-                price_value = data.get('internal_price') or 0
-                region_name = ''
+        save_draft = request.POST.get('save_draft')
+
+        if save_draft:
+            # Черновик: минимум — дата, услуга, регион (или внутренний клиент + цена)
+            draft_errors = []
+            date_val = form.data.get('date')
+            if not date_val:
+                draft_errors.append('Укажите дату.')
             else:
-                region = data['region']
                 try:
-                    rsp = RegionServicePrice.objects.get(region=region, service=service)
-                    price_value = rsp.unit_price * s
-                except RegionServicePrice.DoesNotExist:
-                    messages.error(
-                        request,
-                        f'Не найдена цена для региона "{region.name}" и услуги "{service.name}". '
-                        'Выполните: python manage.py init_services --clear, затем python manage.py load_region_prices',
-                    )
-                    return render(request, 'proposals/form.html', {
-                        'form': form,
-                        'service_units_json': json.dumps({str(s.pk): s.unit_type for s in Service.objects.all()}),
-                    })
-                region_name = region.name
-            client_value = (
-                (data['internal_client'] or '').strip()
-                if data.get('is_internal')
-                else (data['client'] or '')
-            )
-            request.session['proposal_data'] = {
-                'date': data['date'].strftime('%Y-%m-%d'),
-                'service_id': service.pk,
-                'service_name': service.name,
-                'city': region_name,
-                'price': str(price_value),
-                'client': client_value,
-                'room': data['room'] or '',
-                'srok': data['srok'] or '',
-                'text': data['text'] or '',
-                's': '' if data.get('is_internal') else str(s),
-            }
+                    date_obj = datetime.strptime(date_val, '%Y-%m-%d').date()
+                except ValueError:
+                    draft_errors.append('Некорректная дата.')
+                    date_obj = None
+            service_id = form.data.get('service')
+            service = None
+            if service_id:
+                try:
+                    service = Service.objects.get(pk=service_id)
+                except (Service.DoesNotExist, ValueError):
+                    pass
+            if not service:
+                draft_errors.append('Выберите услугу.')
+            is_internal = form.data.get('is_internal') == 'on'
+            region = None
+            if not is_internal:
+                region_id = form.data.get('region')
+                if region_id:
+                    try:
+                        region = Region.objects.get(pk=region_id)
+                    except (Region.DoesNotExist, ValueError):
+                        pass
+                if not region:
+                    draft_errors.append('Выберите регион.')
+            else:
+                internal_client = (form.data.get('internal_client') or '').strip()
+                if not internal_client:
+                    draft_errors.append('Выберите внутреннего клиента.')
+
+            if not draft_errors and date_obj and (service and (region or is_internal)):
+                # Собираем данные из POST (любые заполненные поля)
+                client_value = ''
+                price_value = Decimal(0)
+                region_name = ''
+                if is_internal:
+                    client_value = (form.data.get('internal_client') or '').strip()
+                    try:
+                        price_value = Decimal(str(form.data.get('internal_price') or 0))
+                    except Exception:
+                        price_value = Decimal(0)
+                else:
+                    client_value = (form.data.get('client') or '').strip()
+                    region_name = region.name if region else ''
+                    s_val = form.data.get('s')
+                    try:
+                        s_float = float(s_val or 0)
+                    except (TypeError, ValueError):
+                        s_float = 0
+                    if region and service and s_float >= 0:
+                        try:
+                            rsp = RegionServicePrice.objects.get(region=region, service=service)
+                            price_value = rsp.unit_price * Decimal(str(s_float))
+                        except RegionServicePrice.DoesNotExist:
+                            price_value = Decimal(0)
+                proposal_data = {
+                    'date': date_obj.strftime('%Y-%m-%d'),
+                    'service_id': service.pk,
+                    'service_name': service.name,
+                    'city': region_name,
+                    'price': str(price_value),
+                    'client': client_value,
+                    'room': (form.data.get('room') or '').strip(),
+                    'srok': (form.data.get('srok') or '').strip(),
+                    'text': (form.data.get('text') or '').strip(),
+                    's': form.data.get('s') if not is_internal else '',
+                }
+                if is_internal:
+                    proposal_data['s'] = ''
+                _save_tkp_record(proposal_data, status=TKPRecord.STATUS_DRAFT)
+                messages.success(request, 'Черновик ТКП сохранён в перечень.')
+                return redirect('proposals:table')
+            if draft_errors:
+                for err in draft_errors:
+                    messages.error(request, err)
+        elif form.is_valid():
+            data = form.cleaned_data
+            proposal_data, err = _build_proposal_data_from_form_cleaned(data)
+            if err:
+                messages.error(request, err)
+                return render(request, 'proposals/form.html', {
+                    'form': form,
+                    'service_units_json': json.dumps({str(s.pk): s.unit_type for s in Service.objects.all()}),
+                })
+            request.session['proposal_data'] = proposal_data
             return redirect('proposals:confirm')
     else:
-        form = ProposalForm()
+        draft_id = request.GET.get('draft_id')
+        initial = None
+        if draft_id:
+            try:
+                draft = TKPRecord.objects.get(pk=draft_id, status=TKPRecord.STATUS_DRAFT)
+                if draft.service != 'Комплексное ТКП':
+                    service = Service.objects.filter(name=draft.service).first()
+                    initial = {
+                        'date': draft.date,
+                        'client': draft.client or '',
+                        'room': draft.room or '',
+                        's': draft.s or '',
+                        'text': draft.text or '',
+                    }
+                    if service:
+                        initial['service'] = service.pk
+                    request.session['tkp_draft_id'] = int(draft_id)
+            except (TKPRecord.DoesNotExist, ValueError, TypeError):
+                request.session.pop('tkp_draft_id', None)
+        else:
+            request.session.pop('tkp_draft_id', None)
+        form = ProposalForm(initial=initial) if initial else ProposalForm()
 
     service_units = {str(s.pk): s.unit_type for s in Service.objects.all()}
     return render(request, 'proposals/form.html', {
@@ -225,6 +339,10 @@ def confirm_view(request):
         return redirect('proposals:form')
 
     if request.method == 'POST':
+        if request.POST.get('save_draft'):
+            _save_tkp_record(data, status=TKPRecord.STATUS_DRAFT)
+            messages.success(request, 'Черновик ТКП сохранён в перечень.')
+            return redirect('proposals:table')
         try:
             base_name = _generate_and_save_files(data)
         except Exception as e:
@@ -232,6 +350,9 @@ def confirm_view(request):
             return redirect('proposals:confirm')
         if base_name:
             _save_tkp_record(data)
+            draft_id = request.session.pop('tkp_draft_id', None)
+            if draft_id:
+                TKPRecord.objects.filter(pk=draft_id).delete()
             request.session['tkp_download_base'] = base_name
             return redirect('proposals:download_success')
         messages.error(
@@ -348,7 +469,66 @@ def complex_form_view(request):
         form = ComplexProposalForm(request.POST)
         rows_data = request.POST.get('rows_json', '')
         rows, row_error = _parse_complex_rows(rows_data)
-        if form.is_valid() and not row_error:
+        save_draft = request.POST.get('save_draft')
+
+        if save_draft:
+            # Черновик комплексного ТКП: минимум — дата и регион
+            draft_errors = []
+            date_val = form.data.get('date')
+            if not date_val:
+                draft_errors.append('Укажите дату.')
+            else:
+                try:
+                    datetime.strptime(date_val, '%Y-%m-%d')
+                except ValueError:
+                    draft_errors.append('Некорректная дата.')
+            region_id = form.data.get('region')
+            region = None
+            if region_id:
+                try:
+                    region = Region.objects.get(pk=region_id)
+                except (Region.DoesNotExist, ValueError):
+                    pass
+            if not region:
+                draft_errors.append('Выберите регион.')
+
+            if not draft_errors and region:
+                date_str = date_val
+                client_val = (form.data.get('client') or '').strip()
+                room_val = (form.data.get('room') or '').strip()
+                text1_val = (form.data.get('text1') or '').strip()
+                rows_serializable = []
+                total_sum = Decimal(0)
+                if not row_error and rows:
+                    rows_serializable = [
+                        {
+                            'service_name': r['service_name'],
+                            'comment': r.get('comment', ''),
+                            'srok': r.get('srok', ''),
+                            'unit': r['unit'],
+                            'quantity': str(r['quantity']),
+                            'price_per_unit': str(r['price_per_unit']),
+                            'total': str(r['total']),
+                        }
+                        for r in rows
+                    ]
+                    total_sum = sum(Decimal(str(r['total'])) for r in rows)
+                data = {
+                    'date': date_str,
+                    'client': client_val,
+                    'region_id': region.pk,
+                    'region_name': region.name,
+                    'room': room_val,
+                    'rows': rows_serializable,
+                    'text1': text1_val,
+                }
+                request.session['complex_proposal_data'] = data
+                _save_complex_tkp_record(data, status=TKPRecord.STATUS_DRAFT)
+                messages.success(request, 'Черновик комплексного ТКП сохранён в перечень.')
+                return redirect('proposals:table')
+            for err in draft_errors:
+                messages.error(request, err)
+        elif form.is_valid() and not row_error:
             # Сессия сериализуется в JSON — храним числа как строки
             rows_serializable = [
                 {
@@ -374,10 +554,27 @@ def complex_form_view(request):
             }
             request.session['complex_proposal_data'] = data
             return redirect('proposals:complex_confirm')
-        if row_error:
+        if row_error and not save_draft:
             messages.error(request, row_error)
     else:
-        form = ComplexProposalForm()
+        draft_id = request.GET.get('draft_id')
+        initial = None
+        if draft_id:
+            try:
+                draft = TKPRecord.objects.get(pk=draft_id, status=TKPRecord.STATUS_DRAFT)
+                if draft.service == 'Комплексное ТКП':
+                    initial = {
+                        'date': draft.date,
+                        'client': draft.client or '',
+                        'room': draft.room or '',
+                        'text1': draft.text or '',
+                    }
+                    request.session['complex_draft_id'] = int(draft_id)
+            except (TKPRecord.DoesNotExist, ValueError, TypeError):
+                request.session.pop('complex_draft_id', None)
+        else:
+            request.session.pop('complex_draft_id', None)
+        form = ComplexProposalForm(initial=initial) if initial else ComplexProposalForm()
     services_raw = list(Service.objects.order_by('order', 'name').values('id', 'name', 'unit_type', 'description'))
     services = []
     file_comments = _load_complex_service_comments_file()
@@ -425,6 +622,10 @@ def complex_confirm_view(request):
         return redirect('proposals:complex_form')
 
     if request.method == 'POST':
+        if request.POST.get('save_draft'):
+            _save_complex_tkp_record(data, status=TKPRecord.STATUS_DRAFT)
+            messages.success(request, 'Черновик комплексного ТКП сохранён в перечень.')
+            return redirect('proposals:table')
         try:
             base_name = _generate_complex_and_save_files(data)
         except Exception as e:
@@ -432,6 +633,9 @@ def complex_confirm_view(request):
             return redirect('proposals:complex_confirm')
         if base_name:
             _save_complex_tkp_record(data)
+            draft_id = request.session.pop('complex_draft_id', None)
+            if draft_id:
+                TKPRecord.objects.filter(pk=draft_id).delete()
             request.session['tkp_download_base'] = base_name
             return redirect('proposals:download_success')
         messages.error(request, 'Ошибка генерации. Проверьте шаблон в templates_docx/')
@@ -671,18 +875,26 @@ def _generate_complex_and_save_files(data):
         return base_name
 
 
-def _save_complex_tkp_record(data):
-    """Сохранение записи о сформированном комплексном ТКП."""
+def _save_complex_tkp_record(data, status=None):
+    """Сохранение записи о сформированном комплексном ТКП (status по умолчанию — итоговый)."""
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
-    seq = _get_next_seq_for_date(date_obj)
-    number = _generate_doc_number(data.get('client') or '', date_obj, seq)
-    total_sum = sum(Decimal(str(r['total'])) for r in data['rows'])
+    total_sum = sum(Decimal(str(r['total'])) for r in data.get('rows', []))
+    if status == TKPRecord.STATUS_DRAFT:
+        seq = _get_next_draft_seq_for_date(date_obj)
+        number = _generate_draft_number(date_obj, seq)
+    else:
+        seq = _get_next_seq_for_date(date_obj)
+        number = _generate_doc_number(data.get('client') or '', date_obj, seq)
     TKPRecord.objects.create(
         date=date_obj,
         number=number,
         client=data.get('client') or '',
         service='Комплексное ТКП',
         sum_total=total_sum,
+        room=data.get('room') or '',
+        s='',
+        text=data.get('text1') or '',
+        status=status or TKPRecord.STATUS_FINAL,
     )
 
 
@@ -754,6 +966,12 @@ def table_view(request):
             pass
     services = list(TKPRecord.objects.values_list('service', flat=True).distinct().order_by('service'))
     contract_template_by_service = SERVICE_TO_CONTRACT_TEMPLATE
+    contract_by_tkp = {
+        c.tkp_id: c
+        for c in ContractRecord.objects.filter(
+            status=ContractRecord.STATUS_FINAL, tkp__isnull=False
+        ).select_related('tkp')
+    }
     context = {
         'records': records,
         'filters': {
@@ -767,6 +985,7 @@ def table_view(request):
         },
         'services_list': services,
         'contract_template_by_service': contract_template_by_service,
+        'contract_by_tkp': contract_by_tkp,
     }
     return render(request, 'proposals/table.html', context)
 
@@ -794,15 +1013,29 @@ def contract_form_view(request, tkp_id):
 
     # Предзаполнение из ТКП и карточки контрагента
     date_str = tkp.date.strftime('%Y-%m-%d')
+    # Номер договора: следующий за датой ТКП (при формировании подставится актуальный по дате из формы)
+    next_contract_number = f'{tkp.date:%d%m%Y}_{_get_next_contract_seq_for_date(tkp.date)}'
     initial = {
+        'contract_number': next_contract_number,
         'date': date_str,
         'price': tkp.sum_total,
         'payment_terms': DEFAULT_PAYMENT_TERMS,
         'room': tkp.room or '',
         's': tkp.s or '',
     }
-    first_match = Counterparty.objects.filter(name__icontains=tkp.client).first() if tkp.client else None
-    cp_for_initial = first_match or Counterparty.objects.first()
+    # Контрагент: из GET (возврат из справочника) или по совпадению с клиентом ТКП
+    cp_for_initial = None
+    if request.method != 'POST':
+        cp_id = request.GET.get('counterparty_id')
+        if cp_id:
+            try:
+                cp_for_initial = Counterparty.objects.get(pk=cp_id)
+            except (Counterparty.DoesNotExist, ValueError):
+                pass
+    if not cp_for_initial and tkp.client:
+        cp_for_initial = Counterparty.objects.filter(name__icontains=tkp.client).first()
+    if not cp_for_initial:
+        cp_for_initial = Counterparty.objects.first()
     if cp_for_initial:
         initial['counterparty'] = cp_for_initial.pk
         initial['customer_name'] = cp_for_initial.name or ''  # Наименование заказчика из карточки контрагента
@@ -823,18 +1056,55 @@ def contract_form_view(request, tkp_id):
 
     if request.method == 'POST':
         form = ContractForm(request.POST)
-        if form.is_valid():
+        save_draft = request.POST.get('save_draft')
+        if save_draft:
+            draft_errors = []
+            cp_id = form.data.get('counterparty')
+            date_val = form.data.get('date')
+            number_val = (form.data.get('contract_number') or '').strip()
+            if not cp_id:
+                draft_errors.append('Выберите контрагента.')
+            else:
+                try:
+                    cp = Counterparty.objects.get(pk=cp_id)
+                except (Counterparty.DoesNotExist, ValueError):
+                    cp = None
+                    draft_errors.append('Выберите контрагента.')
+            if not date_val:
+                draft_errors.append('Укажите дату договора.')
+            else:
+                try:
+                    date_obj = datetime.strptime(date_val, '%Y-%m-%d').date()
+                except ValueError:
+                    date_obj = None
+                    draft_errors.append('Некорректная дата.')
+            if not number_val:
+                draft_errors.append('Укажите номер договора.')
+            elif date_obj and ContractRecord.objects.filter(number=number_val).exists():
+                draft_errors.append('Договор с таким номером уже существует.')
+            if not draft_errors and cp and date_obj and number_val:
+                ContractRecord.objects.create(
+                    date=date_obj,
+                    number=number_val,
+                    status=ContractRecord.STATUS_DRAFT,
+                    tkp=tkp,
+                    counterparty=cp,
+                    client=tkp.client or '',
+                    service=tkp.service or '',
+                    sum_total=tkp.sum_total or Decimal(0),
+                )
+                messages.success(request, 'Черновик договора сохранён.')
+                return redirect('proposals:table')
+            for err in draft_errors:
+                messages.error(request, err)
+        elif form.is_valid():
             cd = form.cleaned_data
             cp = cd['counterparty']
             date_obj = cd['date']
             price_val = cd['price']
-            # Номер договора = текущая дата_порядковый номер за день
             seq = _get_next_contract_seq_for_date(date_obj)
             contract_number = f'{date_obj:%d%m%Y}_{seq}'
-            ContractRecord.objects.create(date=date_obj, number=contract_number)
-            # Наименование заказчика из карточки контрагента (поле формы предзаполнено из контрагента)
             customer_name = (cd.get('customer_name') or '').strip() or (cp.name or '')
-            # В лице: первое вхождение — р.п., второе — им.п.
             customer_represented_by = (cd.get('customer_represented_by') or '').strip()
             if not customer_represented_by:
                 customer_represented_by = _director_genitive(cp.director or '')
@@ -867,33 +1137,49 @@ def contract_form_view(request, tkp_id):
             out_format = (request.POST.get('format') or 'docx').strip().lower()
             if out_format != 'pdf':
                 out_format = 'docx'
-            # Имя файла договора = Дог_ + номер договора (дата_порядок)
             file_base = f'Дог_{contract_number}'
-
+            out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
+            out_dir.mkdir(parents=True, exist_ok=True)
+            docx_path = out_dir / f'{file_base}.docx'
+            pdf_path = out_dir / f'{file_base}.pdf'
+            doc.save(str(docx_path))
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmpdir = Path(tmpdir)
+                doc.save(str(tmpdir / 'contract.docx'))
+                _convert_docx_to_pdf(tmpdir / 'contract.docx', tmpdir)
+                src = tmpdir / 'contract.pdf'
+                if not src.exists():
+                    src = tmpdir / 'tkp.pdf'
+                if not src.exists():
+                    src = next(tmpdir.glob('*.pdf'), None)
+                if src and src.exists():
+                    shutil.copy2(src, pdf_path)
+            ContractRecord.objects.create(
+                date=date_obj,
+                number=contract_number,
+                status=ContractRecord.STATUS_FINAL,
+                tkp=tkp,
+                counterparty=cp,
+                client=tkp.client or '',
+                service=tkp.service or '',
+                sum_total=price_val,
+                docx_file=file_base,
+                pdf_file=file_base,
+                contract_snapshot=ctx,
+            )
             if out_format == 'docx':
-                from io import BytesIO
-                buf = BytesIO()
-                doc.save(buf)
-                buf.seek(0)
-                return FileResponse(buf, as_attachment=True, filename=f'{file_base}.docx')
-            else:
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    tmpdir = Path(tmpdir)
-                    docx_path = tmpdir / 'contract.docx'
-                    doc.save(str(docx_path))
-                    _convert_docx_to_pdf(docx_path, tmpdir)
-                    pdf_path = tmpdir / 'contract.pdf'
-                    if not pdf_path.exists():
-                        pdf_path = tmpdir / 'tkp.pdf'  # docx2pdf на Windows создаёт tkp.pdf
-                    if not pdf_path.exists():
-                        pdf_path = next(tmpdir.glob('*.pdf'), None)
-                    if pdf_path and pdf_path.exists():
-                        from io import BytesIO
-                        with open(pdf_path, 'rb') as f:
-                            pdf_buf = BytesIO(f.read())
-                        pdf_buf.seek(0)
-                        return FileResponse(pdf_buf, as_attachment=True, filename=f'{file_base}.pdf')
-                messages.error(request, 'Не удалось сформировать PDF. Установите LibreOffice или docx2pdf.')
+                return FileResponse(
+                    open(docx_path, 'rb'),
+                    as_attachment=True,
+                    filename=f'{file_base}.docx',
+                )
+            if pdf_path.exists():
+                return FileResponse(
+                    open(pdf_path, 'rb'),
+                    as_attachment=True,
+                    filename=f'{file_base}.pdf',
+                )
+            messages.error(request, 'Не удалось сформировать PDF. Установите LibreOffice или docx2pdf.')
         # form errors: show form again
     else:
         form = ContractForm(initial=initial)
@@ -903,6 +1189,74 @@ def contract_form_view(request, tkp_id):
         'tkp': tkp,
         'contract_template_file': contract_template_file,
     })
+
+
+@login_required
+@require_http_methods(['GET'])
+def contract_table_view(request):
+    """Реестр договоров: Дата, Номер, Клиент, Услуга, Сумма, Файлы (docx, pdf)."""
+    records = ContractRecord.objects.select_related('tkp', 'counterparty').order_by('-date', '-created_at')
+    context = {'records': records}
+    return render(request, 'proposals/contract_table.html', context)
+
+
+@login_required
+@require_http_methods(['GET'])
+def contract_card_view(request, contract_id):
+    """Карточка договора (фрагмент для модального окна): реквизиты только для просмотра."""
+    try:
+        contract = ContractRecord.objects.select_related('counterparty', 'tkp').get(pk=contract_id)
+    except ContractRecord.DoesNotExist:
+        raise Http404()
+    snapshot = contract.contract_snapshot or {}
+    _cp = contract.counterparty
+    ctx = {
+        'contract': contract,
+        'date_display': contract.date.strftime('%d.%m.%Y'),
+        'customer_name': snapshot.get('customer_name') or (_cp.name if _cp else '') or contract.client,
+        'customer_represented_by': snapshot.get('customer_represented_by') or (_cp.director and _director_genitive(_cp.director) or '') if _cp else '',
+        'customer_represented_by_nominative': snapshot.get('customer_represented_by_nominative') or (_cp.director if _cp else ''),
+        'price': snapshot.get('price') or _format_price(contract.sum_total),
+        'payment_terms': snapshot.get('payment_terms') or '',
+        'name': snapshot.get('name') or (_cp.name if _cp else ''),
+        'address': snapshot.get('address') or (_cp.address if _cp else ''),
+        'inn': snapshot.get('inn') or (_cp.inn if _cp else ''),
+        'kpp': snapshot.get('kpp') or (_cp.kpp if _cp else ''),
+        'ogrn': snapshot.get('ogrn') or (_cp.ogrn if _cp else ''),
+        'account': snapshot.get('account') or (_cp.account if _cp else ''),
+        'bank': snapshot.get('bank') or (_cp.bank if _cp else ''),
+        'bik': snapshot.get('bik') or (_cp.bik if _cp else ''),
+        'kor_account': snapshot.get('kor_account') or (_cp.kor_account if _cp else ''),
+        'email': snapshot.get('email') or (_cp.email if _cp else ''),
+        'room': snapshot.get('room') or '',
+        's': snapshot.get('s') or '',
+    }
+    return render(request, 'proposals/contract_card_content.html', ctx)
+
+
+@login_required
+@require_http_methods(['GET'])
+def contract_download_file_view(request, contract_id, file_type):
+    """Скачивание файла договора (docx или pdf) по ID записи."""
+    if file_type not in ('docx', 'pdf'):
+        raise Http404()
+    try:
+        contract = ContractRecord.objects.get(pk=contract_id)
+    except ContractRecord.DoesNotExist:
+        raise Http404()
+    base_name = contract.docx_file if file_type == 'docx' else contract.pdf_file
+    if not base_name:
+        raise Http404()
+    out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
+    ext = 'pdf' if file_type == 'pdf' else 'docx'
+    path = out_dir / f'{base_name}.{ext}'
+    if not path.exists():
+        raise Http404()
+    return FileResponse(
+        open(path, 'rb'),
+        as_attachment=True,
+        filename=path.name,
+    )
 
 
 @login_required
@@ -927,9 +1281,11 @@ def counterparties_view(request):
         records = records.filter(name__icontains=name_filter)
     if inn_filter:
         records = records.filter(inn__icontains=inn_filter)
+    return_url = request.GET.get('return_url', '').strip()
     context = {
         'records': records,
         'filters': {'name': name_filter, 'inn': inn_filter},
+        'return_url': return_url,
     }
     return render(request, 'proposals/counterparties.html', context)
 
@@ -1133,21 +1489,36 @@ def _director_genitive(director):
         return (director or '').strip()
 
 
-def _save_tkp_record(data):
-    """Сохранение записи о сформированном ТКП."""
+def _get_next_draft_seq_for_date(date_obj):
+    """Порядковый номер черновика за указанную дату."""
+    return TKPRecord.objects.filter(date=date_obj, status=TKPRecord.STATUS_DRAFT).count() + 1
+
+
+def _generate_draft_number(date_obj, seq):
+    """Номер черновика: Черновик_DDMMYYYY_N."""
+    return f'Черновик_{date_obj:%d%m%Y}_{seq}'
+
+
+def _save_tkp_record(data, status=None):
+    """Сохранение записи о сформированном ТКП (status по умолчанию — итоговый)."""
     from datetime import datetime
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
-    seq = _get_next_seq_for_date(date_obj)
-    number = _generate_doc_number(data.get('client') or '', date_obj, seq)
+    if status == TKPRecord.STATUS_DRAFT:
+        seq = _get_next_draft_seq_for_date(date_obj)
+        number = _generate_draft_number(date_obj, seq)
+    else:
+        seq = _get_next_seq_for_date(date_obj)
+        number = _generate_doc_number(data.get('client') or '', date_obj, seq)
     TKPRecord.objects.create(
         date=date_obj,
         number=number,
         client=data.get('client') or '',
         service=data['service_name'],
-        sum_total=Decimal(data['price']),
+        sum_total=Decimal(data.get('price') or 0),
         room=data.get('room') or '',
         s=str(data.get('s') or ''),
         text=data.get('text') or '',
+        status=status or TKPRecord.STATUS_FINAL,
     )
 
 

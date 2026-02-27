@@ -12,11 +12,11 @@
         <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Основные реквизиты (из ТКП)</h2>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
-                <label for="counterparty-search">Заказчик (контрагент)</label>
-                <input type="text" id="counterparty-search" placeholder="Поиск по наименованию или ИНН (минимум 2 символа)..." autocomplete="off" style="width: 100%; padding: 0.4rem; margin-bottom: 0.25rem;">
-                <div id="counterparty-results" style="display: none; border: 1px solid var(--border, #ccc); border-radius: 4px; max-height: 12rem; overflow-y: auto; background: #fff; position: relative; z-index: 10;"></div>
-                <div id="counterparty-selected" style="margin-top: 0.35rem; font-size: 0.9rem; color: var(--text-muted, #666);"></div>
-                <div style="margin-top: 0.25rem; position: absolute; left: -9999px;" aria-hidden="true">{{ form.counterparty }}</div>
+                {{ form.counterparty.label_tag }}
+                {{ form.counterparty }}
+                <p style="margin: 0.35rem 0 0; font-size: 0.9rem;">
+                    <a href="{% url 'proposals:counterparties' %}?return_url={{ request.build_absolute_uri|urlencode }}">Выбрать из справочника «Контрагенты»</a>
+                </p>
                 {% if form.counterparty.errors %}<ul class="errorlist">{{ form.counterparty.errors }}</ul>{% endif %}
             </div>
             <div>
@@ -134,19 +134,15 @@
     <div class="actions">
         <button type="submit" name="format" value="docx" class="btn">Сформировать договор (DOCX)</button>
         <button type="submit" name="format" value="pdf" class="btn">Сформировать договор (PDF)</button>
-        <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К перечню ТКП</a>
+        <button type="submit" name="save_draft" value="1" class="btn btn-secondary">Сохранить как черновик</button>
+        <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К реестру ТКП</a>
     </div>
 </form>
 
 <script>
 (function() {
-    var searchUrl = '{% url "proposals:counterparty_search" %}';
     var jsonUrlTemplate = '{% url "proposals:counterparty_json" 0 %}';
-    var searchInput = document.getElementById('counterparty-search');
-    var resultsDiv = document.getElementById('counterparty-results');
-    var selectedDiv = document.getElementById('counterparty-selected');
     var selectEl = document.getElementById('id_counterparty');
-    var debounceTimer = null;
 
     function setFieldValue(id, value) {
         var el = document.getElementById(id);
@@ -169,64 +165,15 @@
         setFieldValue('id_email', data.email);
     }
 
-    function showResults(items) {
-        if (!items.length) {
-            resultsDiv.style.display = 'none';
-            return;
-        }
-        resultsDiv.innerHTML = items.map(function(r) {
-            return '<div class="counterparty-result-item" data-id="' + r.id + '" style="padding: 0.4rem 0.6rem; cursor: pointer; border-bottom: 1px solid #eee;">' +
-                (r.name ? '<strong>' + escapeHtml(r.name) + '</strong>' : '') +
-                (r.inn ? ' <span style="color: #666;">ИНН ' + escapeHtml(r.inn) + '</span>' : '') +
-                '</div>';
-        }).join('');
-        resultsDiv.style.display = 'block';
-        resultsDiv.querySelectorAll('.counterparty-result-item').forEach(function(node) {
-            node.addEventListener('click', function() {
-                var id = this.getAttribute('data-id');
-                selectEl.value = id;
-                searchInput.value = '';
-                resultsDiv.style.display = 'none';
-                selectedDiv.textContent = 'Выбран: ' + (this.textContent.trim() || 'ID ' + id);
-                fetch(jsonUrlTemplate.replace('/0/', '/' + id + '/'))
-                    .then(function(res) { return res.ok ? res.json() : Promise.reject(); })
-                    .then(fillFormFromCounterparty)
-                    .catch(function() {});
-            });
+    if (selectEl) {
+        selectEl.addEventListener('change', function() {
+            var id = this.value;
+            if (!id) return;
+            fetch(jsonUrlTemplate.replace('/0/', '/' + id + '/'))
+                .then(function(res) { return res.ok ? res.json() : Promise.reject(); })
+                .then(fillFormFromCounterparty)
+                .catch(function() {});
         });
-    }
-
-    function escapeHtml(s) {
-        var div = document.createElement('div');
-        div.textContent = s;
-        return div.innerHTML;
-    }
-
-    searchInput.addEventListener('input', function() {
-        var q = searchInput.value.trim();
-        clearTimeout(debounceTimer);
-        if (q.length < 2) {
-            resultsDiv.style.display = 'none';
-            return;
-        }
-        debounceTimer = setTimeout(function() {
-            fetch(searchUrl + '?q=' + encodeURIComponent(q))
-                .then(function(res) { return res.json(); })
-                .then(function(data) { showResults(data.results || []); })
-                .catch(function() { showResults([]); });
-        }, 250);
-    });
-
-    searchInput.addEventListener('focus', function() {
-        if (searchInput.value.trim().length >= 2 && resultsDiv.innerHTML) resultsDiv.style.display = 'block';
-    });
-
-    document.addEventListener('click', function(e) {
-        if (!resultsDiv.contains(e.target) && e.target !== searchInput) resultsDiv.style.display = 'none';
-    });
-
-    if (selectEl.selectedIndex > 0 && selectEl.options[selectEl.selectedIndex]) {
-        selectedDiv.textContent = 'Выбран: ' + selectEl.options[selectEl.selectedIndex].text;
     }
 })();
 </script>

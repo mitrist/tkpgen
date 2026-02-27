@@ -4,6 +4,14 @@ register = template.Library()
 
 
 @register.filter
+def get_item(d, key):
+    """Доступ к элементу словаря по ключу: {{ dict|get_item:key }}."""
+    if d is None:
+        return None
+    return d.get(key) if hasattr(d, 'get') else None
+
+
+@register.filter
 def format_price(value):
     """Форматирование суммы с разделителями тысяч."""
     if value is None:

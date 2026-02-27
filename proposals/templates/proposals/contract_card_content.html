@@ -1,0 +1,35 @@
+<div class="contract-card-content" style="max-height: 85vh; overflow-y: auto;">
+    <h2 style="font-size: 1.1rem; margin-bottom: 1rem;">Договор № {{ contract.number }} от {{ date_display }}</h2>
+    <section style="margin-bottom: 1rem;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Основные реквизиты</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted); width: 12rem;">Контрагент (заказчик)</td><td style="padding: 0.25rem 0;">{{ customer_name|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">В лице (род. п.)</td><td style="padding: 0.25rem 0;">{{ customer_represented_by|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">В лице (им. п.)</td><td style="padding: 0.25rem 0;">{{ customer_represented_by_nominative|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Сумма</td><td style="padding: 0.25rem 0;">{{ price }} ₽</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted); vertical-align: top;">Условия оплаты</td><td style="padding: 0.25rem 0; white-space: pre-wrap;">{{ payment_terms|default:"—" }}</td></tr>
+        </table>
+    </section>
+    <section style="margin-bottom: 1rem;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Реквизиты заказчика (в подписи)</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted); width: 12rem;">Наименование</td><td style="padding: 0.25rem 0;">{{ name|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Адрес</td><td style="padding: 0.25rem 0;">{{ address|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">ИНН</td><td style="padding: 0.25rem 0;">{{ inn|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">КПП</td><td style="padding: 0.25rem 0;">{{ kpp|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">ОГРН</td><td style="padding: 0.25rem 0;">{{ ogrn|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Р/с</td><td style="padding: 0.25rem 0;">{{ account|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Банк</td><td style="padding: 0.25rem 0;">{{ bank|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">БИК</td><td style="padding: 0.25rem 0;">{{ bik|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">К/с</td><td style="padding: 0.25rem 0;">{{ kor_account|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Email</td><td style="padding: 0.25rem 0;">{{ email|default:"—" }}</td></tr>
+        </table>
+    </section>
+    <section style="margin-bottom: 1rem;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Границы подготовки документации</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted); width: 12rem;">Помещение / объект</td><td style="padding: 0.25rem 0;">{{ room|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Площадь (S)</td><td style="padding: 0.25rem 0;">{{ s|default:"—" }}</td></tr>
+        </table>
+    </section>
+</div>

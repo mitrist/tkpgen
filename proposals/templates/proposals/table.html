@@ -1,10 +1,10 @@
 {% extends "proposals/base.html" %}
 {% load proposal_filters %}
-{% block title %}Перечень ТКП{% endblock %}
+{% block title %}Реестр ТКП{% endblock %}
 {% block container_extra_class %}container--wide{% endblock %}
 {% block content %}
 <div style="overflow-x: auto;">
-<h1>Перечень сформированных ТКП</h1>
+<h1>Реестр ТКП</h1>
 <form method="get" action="{% url 'proposals:table' %}" class="summary" style="margin-bottom: 1rem;">
     <p style="margin: 0 0 0.5rem; font-weight: 600; font-size: 0.9rem;">Фильтры по столбцам</p>
     <table class="table-filters" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
@@ -53,11 +53,11 @@
     <thead>
         <tr style="border-bottom: 2px solid var(--border);">
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Время</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер документа</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
             <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Статус</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Договор</th>
             <th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Удалить</th>
@@ -65,19 +65,30 @@
     </thead>
     <tbody>
         {% for r in records %}
-        <tr style="border-bottom: 1px solid var(--border);">
+        {% with contract_for_row=contract_by_tkp|get_item:r.pk %}
+        <tr class="{% if r.status == 'draft' %}tkp-row-draft{% elif contract_for_row %}tkp-row-with-contract{% endif %}" style="border-bottom: 1px solid var(--border);">
             <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
-            <td style="padding: 0.4rem 0.5rem;">{{ r.created_at|time:"H:i" }}</td>
-            <td style="padding: 0.4rem 0.5rem;">{{ r.number }}</td>
+            <td style="padding: 0.4rem 0.5rem;">
+                {% if r.status == 'draft' %}
+                <a href="{% if r.service == 'Комплексное ТКП' %}{% url 'proposals:complex_form' %}?draft_id={{ r.pk }}{% else %}{% url 'proposals:form' %}?draft_id={{ r.pk }}{% endif %}">{{ r.number }}</a>
+                {% else %}
+                {{ r.number }}
+                {% endif %}
+            </td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.service }}</td>
             <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.get_status_display|default:"Итоговый" }}</td>
             <td style="padding: 0.4rem 0.5rem;">
+                {% if r.status == 'draft' %}—{% else %}
                 <a href="{% url 'proposals:download_file' 'pdf' %}?f={{ r.number|urlencode }}" class="table-file-link">.pdf</a>
                 <a href="{% url 'proposals:download_file' 'docx' %}?f={{ r.number|urlencode }}" class="table-file-link">.docx</a>
+                {% endif %}
             </td>
             <td style="padding: 0.4rem 0.5rem;">
-                {% if r.service in contract_template_by_service %}
+                {% if r.status == 'draft' %}—{% elif contract_for_row %}
+                <a href="#" class="btn btn-sm btn-contract-done" data-contract-card="{% url 'proposals:contract_card' contract_for_row.pk %}">Договор сформирован</a>
+                {% elif r.service in contract_template_by_service %}
                 <a href="{% url 'proposals:contract_form' r.pk %}" class="btn btn-sm">Сформировать Договор</a>
                 {% else %}
                 —
@@ -91,6 +102,7 @@
                 </form>
             </td>
         </tr>
+        {% endwith %}
         {% empty %}
         <tr>
             <td colspan="9" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
@@ -101,11 +113,23 @@
 <p style="margin-top: 1.5rem;">
     <a href="{% url 'proposals:form' %}" class="btn">Формирование ТКП</a>
 </p>
+<div id="contract-card-modal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-box" style="background: var(--bg, #fff); border-radius: 8px; max-width: 90%; max-height: 90vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <div class="modal-header" style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 600;">Карточка договора</span>
+            <button type="button" class="btn btn-secondary btn-sm modal-close" aria-label="Закрыть">Закрыть</button>
+        </div>
+        <div class="modal-body" style="padding: 1rem;"></div>
+    </div>
 </div>
 <style>
 .btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
 .table-file-link { margin-right: 0.5rem; }
 .table-file-link:last-of-type { margin-right: 0; }
+.tkp-row-draft { background-color: #fffde7; }
+.tkp-row-with-contract { background-color: #e8f5e9; }
+.btn-contract-done { background-color: #2e7d32; color: #fff; border-color: #2e7d32; }
+.btn-contract-done:hover { background-color: #1b5e20; color: #fff; }
 @media (max-width: 992px) {
     .table-filters { display: block; }
     .table-filters tr { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -115,4 +139,33 @@
     .table-tkp-list th, .table-tkp-list td { padding: 0.35rem 0.4rem; }
 }
 </style>
+<script>
+(function() {
+    var modal = document.getElementById('contract-card-modal');
+    var body = modal && modal.querySelector('.modal-body');
+    var closeBtn = modal && modal.querySelector('.modal-close');
+    function showModal(html) {
+        if (body) body.innerHTML = html;
+        if (modal) modal.style.display = 'flex';
+    }
+    function hideModal() {
+        if (modal) modal.style.display = 'none';
+    }
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) hideModal();
+        });
+    }
+    if (closeBtn) closeBtn.addEventListener('click', hideModal);
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest && e.target.closest('.btn-contract-done');
+        if (!btn || !btn.dataset.contractCard) return;
+        e.preventDefault();
+        fetch(btn.dataset.contractCard)
+            .then(function(r) { return r.text(); })
+            .then(showModal)
+            .catch(function() { showModal('<p>Не удалось загрузить карточку.</p>'); });
+    });
+})();
+</script>
 {% endblock %}

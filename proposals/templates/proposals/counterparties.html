@@ -5,6 +5,7 @@
 <div style="overflow-x: auto;">
 <h1>Контрагенты</h1>
 <form method="get" action="{% url 'proposals:counterparties' %}" class="summary" style="margin-bottom: 1rem;">
+    {% if return_url %}<input type="hidden" name="return_url" value="{{ return_url }}">{% endif %}
     <p style="margin: 0 0 0.5rem; font-weight: 600; font-size: 0.9rem;">Фильтры</p>
     <table class="table-filters" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
         <tr>
@@ -38,6 +39,7 @@
             <th style="text-align: left; padding: 0.4rem 0.5rem;">к/с</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Телефон</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Эл. почта</th>
+            {% if return_url %}<th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Выбрать</th>{% endif %}
             <th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Удалить</th>
         </tr>
     </thead>
@@ -56,6 +58,11 @@
             <td style="padding: 0.4rem 0.5rem;">{{ r.kor_account|default:"—" }}</td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.phone|default:"—" }}</td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.email|default:"—" }}</td>
+            {% if return_url %}
+            <td style="padding: 0.4rem 0.5rem; text-align: center;">
+                <a href="{{ return_url }}{% if '?' in return_url %}&{% else %}?{% endif %}counterparty_id={{ r.pk }}" class="btn btn-sm">Выбрать</a>
+            </td>
+            {% endif %}
             <td style="padding: 0.4rem 0.5rem; text-align: center;">
                 <form method="post" action="{% url 'proposals:counterparties' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Удалить контрагента?');">
                     {% csrf_token %}
@@ -66,7 +73,7 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="13" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет контрагентов. Добавьте реквизиты через «Добавление реквизитов» и нажмите «Создать карточку».</td>
+            <td colspan="{% if return_url %}14{% else %}13{% endif %}" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет контрагентов. Добавьте реквизиты через «Добавление реквизитов» и нажмите «Создать карточку».</td>
         </tr>
         {% endfor %}
     </tbody>

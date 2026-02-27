@@ -73,6 +73,12 @@ class RegionServicePrice(models.Model):
 
 class TKPRecord(models.Model):
     """Запись о сформированном ТКП (карточка ТКП для договора)."""
+    STATUS_DRAFT = 'draft'
+    STATUS_FINAL = 'final'
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Черновик'),
+        (STATUS_FINAL, 'Итоговый'),
+    ]
     date = models.DateField('Дата')
     number = models.CharField('Номер документа', max_length=150, unique=True)
     client = models.CharField('Клиент', max_length=255, blank=True)
@@ -81,6 +87,12 @@ class TKPRecord(models.Model):
     room = models.TextField('Параметры объекта / помещение', blank=True)
     s = models.CharField('Площадь / количество', max_length=100, blank=True)
     text = models.TextField('Произвольный текст из ТКП', blank=True)
+    status = models.CharField(
+        'Статус',
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_FINAL,
+    )
     created_at = models.DateTimeField('Создано', auto_now_add=True)
 
     class Meta:
@@ -118,9 +130,37 @@ class Counterparty(models.Model):
 
 
 class ContractRecord(models.Model):
-    """Запись о сформированном договоре (для нумерации: дата + порядковый номер за день)."""
+    """Запись о сформированном договоре или черновике."""
+    STATUS_DRAFT = 'draft'
+    STATUS_FINAL = 'final'
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Черновик'),
+        (STATUS_FINAL, 'Итоговый'),
+    ]
     date = models.DateField('Дата договора')
     number = models.CharField('Номер договора', max_length=50, unique=True)
+    status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default=STATUS_FINAL)
+    tkp = models.ForeignKey(
+        TKPRecord,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='ТКП',
+        related_name='contracts',
+    )
+    counterparty = models.ForeignKey(
+        Counterparty,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Контрагент',
+    )
+    client = models.CharField('Клиент', max_length=500, blank=True)
+    service = models.CharField('Услуга', max_length=255, blank=True)
+    sum_total = models.DecimalField('Сумма', max_digits=15, decimal_places=2, default=0)
+    docx_file = models.CharField('Файл DOCX', max_length=255, blank=True)
+    pdf_file = models.CharField('Файл PDF', max_length=255, blank=True)
+    contract_snapshot = models.JSONField('Снимок реквизитов', null=True, blank=True)
     created_at = models.DateTimeField('Создано', auto_now_add=True)
 
     class Meta:
