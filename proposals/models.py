@@ -72,12 +72,15 @@ class RegionServicePrice(models.Model):
 
 
 class TKPRecord(models.Model):
-    """Запись о сформированном ТКП."""
+    """Запись о сформированном ТКП (карточка ТКП для договора)."""
     date = models.DateField('Дата')
     number = models.CharField('Номер документа', max_length=150, unique=True)
     client = models.CharField('Клиент', max_length=255, blank=True)
     service = models.CharField('Услуга', max_length=255)
     sum_total = models.DecimalField('Сумма', max_digits=15, decimal_places=2, default=0)
+    room = models.TextField('Параметры объекта / помещение', blank=True)
+    s = models.CharField('Площадь / количество', max_length=100, blank=True)
+    text = models.TextField('Произвольный текст из ТКП', blank=True)
     created_at = models.DateTimeField('Создано', auto_now_add=True)
 
     class Meta:
@@ -87,3 +90,43 @@ class TKPRecord(models.Model):
 
     def __str__(self):
         return f'{self.number} — {self.client}'
+
+
+class Counterparty(models.Model):
+    """Контрагент: реквизиты из карточки «Добавление реквизитов»."""
+    name = models.CharField('Наименование', max_length=500, blank=True)
+    inn = models.CharField('ИНН', max_length=12, blank=True)
+    address = models.TextField('Адрес', blank=True)
+    director = models.CharField('Генеральный директор', max_length=255, blank=True)
+    ogrn = models.CharField('ОГРН', max_length=15, blank=True)
+    account = models.CharField('Расчетный счет', max_length=64, blank=True)
+    bank = models.CharField('Наименование банка', max_length=500, blank=True)
+    bik = models.CharField('БИК', max_length=9, blank=True)
+    kor_account = models.CharField('Корр. счет', max_length=64, blank=True)
+    phone = models.CharField('Телефон', max_length=64, blank=True)
+    email = models.CharField('Эл. почта', max_length=255, blank=True)
+    kpp = models.CharField('КПП', max_length=9, blank=True)
+    created_at = models.DateTimeField('Создано', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Контрагент'
+        verbose_name_plural = 'Контрагенты'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name or self.inn or f'Контрагент #{self.pk}'
+
+
+class ContractRecord(models.Model):
+    """Запись о сформированном договоре (для нумерации: дата + порядковый номер за день)."""
+    date = models.DateField('Дата договора')
+    number = models.CharField('Номер договора', max_length=50, unique=True)
+    created_at = models.DateTimeField('Создано', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Запись договора'
+        verbose_name_plural = 'Записи договоров'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.number

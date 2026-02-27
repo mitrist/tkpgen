@@ -7,13 +7,16 @@ from docx import Document
 FIELD_ORDER = (
     'name',
     'inn',
+    'kpp',
     'address',
     'director',
     'ogrn',
     'account',
     'bank',
     'bik',
+    'kor_account',
     'phone',
+    'email',
 )
 
 
@@ -98,6 +101,13 @@ def _extract_requisites(raw_text):
             r'\bИНН\/КПП\s*[:\-]?\s*(\d{10,12})\b',
         ),
     )
+    result['kpp'] = _search_first(
+        text,
+        (
+            r'\bКПП\s*[:\-]?\s*(\d{9})\b',
+            r'ИНН\s*[:\-]?\s*\d{10,12}\s*[\/\s]\s*КПП\s*[:\-]?\s*(\d{9})\b',
+        ),
+    )
     result['ogrn'] = _search_first(text, (r'\bОГРН\s*[:\-]?\s*(\d{13,15})\b',))
     result['bik'] = _search_first(text, (r'\bБИК\s*[:\-]?\s*(\d{9})\b',))
     result['account'] = _search_first(
@@ -146,6 +156,21 @@ def _extract_requisites(raw_text):
                 break
 
     result['address'] = _find_value_by_labels(lines, ('адрес', 'юридический адрес', 'местонахождение'))
+    result['kor_account'] = _search_first(
+        text,
+        (
+            r'(?:к\/с|корр\.?\s*счет|корреспондентский\s+счет)\s*[:\-]?\s*([0-9 ]{20,30})',
+            r'к/с\s*[:\-]?\s*([0-9]{20})',
+        ),
+        postprocess_digits=True,
+    )
+    result['email'] = _search_first(
+        text,
+        (
+            r'(?:эл\.?\s*почта|e-?mail|e-mail)\s*[:\-]?\s*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)',
+            r'([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)',
+        ),
+    )
     result['bank'] = _find_value_by_labels(
         lines,
         ('наименование банка', 'банк получателя', 'в банке'),

@@ -11,19 +11,28 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from docxtpl import DocxTemplate
 
-from .forms import ComplexProposalForm, ProposalForm, RequisitesParseForm, SROK_CHOICES, TariffForm
-from .models import Region, RegionServicePrice, Service, TKPRecord
+from .forms import ComplexProposalForm, ContractForm, ProposalForm, RequisitesParseForm, SROK_CHOICES, TariffForm
+from .models import ContractRecord, Counterparty, Region, RegionServicePrice, Service, TKPRecord
 from .requisites_parser import FIELD_ORDER, parse_requisites_file
 
 COMPLEX_TEMPLATE_NAME = 'Шаблон 9 Комплексное ТКП.docx'
 UNIT_DISPLAY = {'m2': 'м²', 'piece': 'шт'}
+
+# Соответствие услуги ТКП → файл шаблона договора (в templates_docx)
+SERVICE_TO_CONTRACT_TEMPLATE = {
+    'ДП': 'Шаблон договора_Дизайн_проект.docx',
+}
+
+# Текст условий оплаты по умолчанию для договора
+DEFAULT_PAYMENT_TERMS = """2.2.1. В течение 5 (пяти) рабочих дней на основании выставленного Исполнителем счета Заказчик выплачивает Исполнителю аванс в размере 30% от цены Договора;
+2.2.2. В течение 5 (пяти) рабочих дней после приемки/утверждения результатов работ Заказчик выплачивает Исполнителю оставшиеся 70% цены Договора."""
 
 # Отображаемые названия услуг в форме «Комплексное ТКП» (колонка «Компонент услуги»)
 COMPLEX_SERVICE_DISPLAY_NAMES = {
@@ -126,6 +135,12 @@ def _sanitize_filename(name):
 def _get_next_seq_for_date(date_obj):
     """Порядковый номер ТКП на указанную дату."""
     count = TKPRecord.objects.filter(date=date_obj).count()
+    return count + 1
+
+
+def _get_next_contract_seq_for_date(date_obj):
+    """Порядковый номер договора за указанную дату (текущая дата_порядковый номер)."""
+    count = ContractRecord.objects.filter(date=date_obj).count()
     return count + 1
 
 
@@ -266,7 +281,8 @@ def download_file_view(request, file_type):
     base_name = request.GET.get('f', '').strip()
     if not base_name or file_type not in ('pdf', 'docx'):
         raise Http404()
-    if not re.match(r'^[a-zA-Z0-9_\-\u0400-\u04FF]+$', base_name):
+    # Допускаем буквы (латиница, кириллица), цифры, _, -, « », №
+    if not re.match(r'^[a-zA-Z0-9_\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
         raise Http404()
     out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
     ext = 'pdf' if file_type == 'pdf' else 'docx'
@@ -737,6 +753,7 @@ def table_view(request):
         except (ValueError, Exception):
             pass
     services = list(TKPRecord.objects.values_list('service', flat=True).distinct().order_by('service'))
+    contract_template_by_service = SERVICE_TO_CONTRACT_TEMPLATE
     context = {
         'records': records,
         'filters': {
@@ -749,8 +766,211 @@ def table_view(request):
             'sum_max': sum_max,
         },
         'services_list': services,
+        'contract_template_by_service': contract_template_by_service,
     }
     return render(request, 'proposals/table.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def contract_form_view(request, tkp_id):
+    """Форма реквизитов договора по выбранному ТКП; генерация docx."""
+    try:
+        tkp = TKPRecord.objects.get(pk=tkp_id)
+    except TKPRecord.DoesNotExist:
+        messages.error(request, 'Запись ТКП не найдена.')
+        return redirect('proposals:table')
+
+    contract_template_file = SERVICE_TO_CONTRACT_TEMPLATE.get(tkp.service)
+    if not contract_template_file:
+        messages.error(request, f'Для услуги «{tkp.service}» формирование договора не предусмотрено.')
+        return redirect('proposals:table')
+
+    templates_dir = getattr(settings, 'TEMPLATES_DOCX_DIR', Path(settings.BASE_DIR) / 'templates_docx')
+    template_path = templates_dir / contract_template_file
+    if not template_path.exists():
+        messages.error(request, f'Шаблон договора не найден: {contract_template_file}')
+        return redirect('proposals:table')
+
+    # Предзаполнение из ТКП и карточки контрагента
+    date_str = tkp.date.strftime('%Y-%m-%d')
+    initial = {
+        'date': date_str,
+        'price': tkp.sum_total,
+        'payment_terms': DEFAULT_PAYMENT_TERMS,
+        'room': tkp.room or '',
+        's': tkp.s or '',
+    }
+    first_match = Counterparty.objects.filter(name__icontains=tkp.client).first() if tkp.client else None
+    cp_for_initial = first_match or Counterparty.objects.first()
+    if cp_for_initial:
+        initial['counterparty'] = cp_for_initial.pk
+        initial['customer_name'] = cp_for_initial.name or ''  # Наименование заказчика из карточки контрагента
+        initial['customer_represented_by'] = _director_genitive(cp_for_initial.director or '')
+        initial['customer_represented_by_nominative'] = cp_for_initial.director or ''  # им.п. для второго вхождения
+        initial['name'] = cp_for_initial.name or ''
+        initial['address'] = cp_for_initial.address or ''
+        initial['inn'] = cp_for_initial.inn or ''
+        initial['kpp'] = cp_for_initial.kpp or ''
+        initial['ogrn'] = cp_for_initial.ogrn or ''
+        initial['account'] = cp_for_initial.account or ''
+        initial['bank'] = cp_for_initial.bank or ''
+        initial['bik'] = cp_for_initial.bik or ''
+        initial['kor_account'] = cp_for_initial.kor_account or ''
+        initial['email'] = cp_for_initial.email or ''
+    else:
+        initial['customer_name'] = tkp.client or ''
+
+    if request.method == 'POST':
+        form = ContractForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            cp = cd['counterparty']
+            date_obj = cd['date']
+            price_val = cd['price']
+            # Номер договора = текущая дата_порядковый номер за день
+            seq = _get_next_contract_seq_for_date(date_obj)
+            contract_number = f'{date_obj:%d%m%Y}_{seq}'
+            ContractRecord.objects.create(date=date_obj, number=contract_number)
+            # Наименование заказчика из карточки контрагента (поле формы предзаполнено из контрагента)
+            customer_name = (cd.get('customer_name') or '').strip() or (cp.name or '')
+            # В лице: первое вхождение — р.п., второе — им.п.
+            customer_represented_by = (cd.get('customer_represented_by') or '').strip()
+            if not customer_represented_by:
+                customer_represented_by = _director_genitive(cp.director or '')
+            customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
+            payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+            ctx = {
+                'contract_number': contract_number,
+                'number': contract_number,
+                'date': date_obj.strftime('%d.%m.%Y'),
+                'customer_name': customer_name,
+                'customer_represented_by': customer_represented_by,
+                'customer_represented_by_nominative': customer_represented_by_nominative,
+                'price': _format_price(price_val),
+                'payment_terms': payment_terms,
+                'name': cd.get('name') or cp.name or '',
+                'address': cd.get('address') or cp.address or '',
+                'inn': cd.get('inn') or cp.inn or '',
+                'kpp': cd.get('kpp') or cp.kpp or '',
+                'ogrn': cd.get('ogrn') or cp.ogrn or '',
+                'account': cd.get('account') or cp.account or '',
+                'bank': cd.get('bank') or cp.bank or '',
+                'bik': cd.get('bik') or cp.bik or '',
+                'kor_account': cd.get('kor_account') or cp.kor_account or '',
+                'email': cd.get('email') or cp.email or '',
+                'room': cd.get('room') or tkp.room or '',
+                's': cd.get('s') or tkp.s or '',
+            }
+            doc = DocxTemplate(str(template_path))
+            doc.render(ctx)
+            out_format = (request.POST.get('format') or 'docx').strip().lower()
+            if out_format != 'pdf':
+                out_format = 'docx'
+            # Имя файла договора = Дог_ + номер договора (дата_порядок)
+            file_base = f'Дог_{contract_number}'
+
+            if out_format == 'docx':
+                from io import BytesIO
+                buf = BytesIO()
+                doc.save(buf)
+                buf.seek(0)
+                return FileResponse(buf, as_attachment=True, filename=f'{file_base}.docx')
+            else:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    tmpdir = Path(tmpdir)
+                    docx_path = tmpdir / 'contract.docx'
+                    doc.save(str(docx_path))
+                    _convert_docx_to_pdf(docx_path, tmpdir)
+                    pdf_path = tmpdir / 'contract.pdf'
+                    if not pdf_path.exists():
+                        pdf_path = tmpdir / 'tkp.pdf'  # docx2pdf на Windows создаёт tkp.pdf
+                    if not pdf_path.exists():
+                        pdf_path = next(tmpdir.glob('*.pdf'), None)
+                    if pdf_path and pdf_path.exists():
+                        from io import BytesIO
+                        with open(pdf_path, 'rb') as f:
+                            pdf_buf = BytesIO(f.read())
+                        pdf_buf.seek(0)
+                        return FileResponse(pdf_buf, as_attachment=True, filename=f'{file_base}.pdf')
+                messages.error(request, 'Не удалось сформировать PDF. Установите LibreOffice или docx2pdf.')
+        # form errors: show form again
+    else:
+        form = ContractForm(initial=initial)
+
+    return render(request, 'proposals/contract_form.html', {
+        'form': form,
+        'tkp': tkp,
+        'contract_template_file': contract_template_file,
+    })
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def counterparties_view(request):
+    """Список контрагентов (реквизиты из карточки). Фильтры по наименованию и ИНН; удаление."""
+    if request.method == 'POST':
+        delete_id = request.POST.get('delete_id', '').strip()
+        if delete_id:
+            try:
+                Counterparty.objects.filter(pk=delete_id).delete()
+                messages.success(request, 'Контрагент удалён.')
+            except Exception:
+                pass
+            q = request.GET.urlencode()
+            url = reverse('proposals:counterparties') + ('?' + q if q else '')
+            return redirect(url)
+    records = Counterparty.objects.all()
+    name_filter = request.GET.get('name', '').strip()
+    inn_filter = request.GET.get('inn', '').strip()
+    if name_filter:
+        records = records.filter(name__icontains=name_filter)
+    if inn_filter:
+        records = records.filter(inn__icontains=inn_filter)
+    context = {
+        'records': records,
+        'filters': {'name': name_filter, 'inn': inn_filter},
+    }
+    return render(request, 'proposals/counterparties.html', context)
+
+
+@login_required
+@require_http_methods(['GET'])
+def counterparty_search_view(request):
+    """Поиск контрагентов по наименованию и ИНН (JSON для автоподстановки в форме договора)."""
+    q = (request.GET.get('q') or '').strip()
+    if not q or len(q) < 2:
+        return JsonResponse({'results': []})
+    from django.db.models import Q
+    qs = Counterparty.objects.filter(
+        Q(name__icontains=q) | Q(inn__icontains=q)
+    ).order_by('name')[:20]
+    results = [{'id': c.pk, 'name': c.name or '', 'inn': c.inn or ''} for c in qs]
+    return JsonResponse({'results': results})
+
+
+@login_required
+@require_http_methods(['GET'])
+def counterparty_json_view(request, pk):
+    """Реквизиты контрагента по ID (JSON для подстановки в форму договора)."""
+    try:
+        cp = Counterparty.objects.get(pk=pk)
+    except Counterparty.DoesNotExist:
+        return JsonResponse({}, status=404)
+    return JsonResponse({
+        'name': cp.name or '',
+        'inn': cp.inn or '',
+        'kpp': cp.kpp or '',
+        'address': cp.address or '',
+        'director': cp.director or '',
+        'director_genitive': _director_genitive(cp.director or ''),
+        'ogrn': cp.ogrn or '',
+        'account': cp.account or '',
+        'bank': cp.bank or '',
+        'bik': cp.bik or '',
+        'kor_account': cp.kor_account or '',
+        'email': cp.email or '',
+    })
 
 
 @login_required
@@ -867,6 +1087,13 @@ def requisites_add_view(request):
                 if not any(card_data.values()):
                     form.add_error(None, 'Заполните хотя бы одно поле реквизитов, чтобы сформировать карточку.')
                     card_data = None
+                else:
+                    inn = card_data.get('inn', '').strip()
+                    if inn and Counterparty.objects.filter(inn=inn).exists():
+                        messages.warning(request, 'Контрагент уже заведён (такой ИНН есть в таблице Контрагенты).')
+                    else:
+                        Counterparty.objects.create(**card_data)
+                        messages.success(request, 'Карточка создана. Контрагент добавлен в таблицу Контрагенты.')
             else:
                 messages.error(request, 'Проверьте корректность заполнения полей.')
 
@@ -884,6 +1111,28 @@ def _generate_doc_number(client, date_obj, seq):
     return f'{client_safe}_{date_str}_{seq}'
 
 
+def _director_genitive(director):
+    """ФИО директора в родительном падеже (для «Заказчик в лице … действующего»)."""
+    if not director or not (director or '').strip():
+        return ''
+    try:
+        import pymorphy2
+        morph = pymorphy2.MorphAnalyzer()
+        parts = (director or '').strip().split()
+        result = []
+        for word in parts:
+            parsed = morph.parse(word)
+            if not parsed:
+                result.append(word)
+                continue
+            p = parsed[0]
+            inflected = p.inflect({'gent'}) if p.tag.case else None
+            result.append(inflected.word if inflected else word)
+        return ' '.join(result)
+    except Exception:
+        return (director or '').strip()
+
+
 def _save_tkp_record(data):
     """Сохранение записи о сформированном ТКП."""
     from datetime import datetime
@@ -896,6 +1145,9 @@ def _save_tkp_record(data):
         client=data.get('client') or '',
         service=data['service_name'],
         sum_total=Decimal(data['price']),
+        room=data.get('room') or '',
+        s=str(data.get('s') or ''),
+        text=data.get('text') or '',
     )
 
 

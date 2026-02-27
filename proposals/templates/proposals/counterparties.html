@@ -1,0 +1,89 @@
+{% extends "proposals/base.html" %}
+{% block title %}Контрагенты{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<div style="overflow-x: auto;">
+<h1>Контрагенты</h1>
+<form method="get" action="{% url 'proposals:counterparties' %}" class="summary" style="margin-bottom: 1rem;">
+    <p style="margin: 0 0 0.5rem; font-weight: 600; font-size: 0.9rem;">Фильтры</p>
+    <table class="table-filters" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+        <tr>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_name" style="font-size: 0.75rem;">Наименование</label>
+                <input type="text" name="name" id="id_name" value="{{ filters.name }}" placeholder="часть названия" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_inn" style="font-size: 0.75rem;">ИНН</label>
+                <input type="text" name="inn" id="id_inn" value="{{ filters.inn }}" placeholder="ИНН" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom; white-space: nowrap;">
+                <button type="submit" class="btn btn-sm">Применить</button>
+                <a href="{% url 'proposals:counterparties' %}" class="btn btn-secondary btn-sm" style="margin-left: 0.2rem;">Сбросить</a>
+            </td>
+        </tr>
+    </table>
+</form>
+<table class="table-tkp-list" style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8125rem;">
+    <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Наименование</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">ИНН</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">КПП</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Адрес</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Ген. директор</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">ОГРН</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">р/с</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Банк</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">БИК</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">к/с</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Телефон</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Эл. почта</th>
+            <th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Удалить</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in records %}
+        <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.4rem 0.5rem;">{{ r.name|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.inn|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.kpp|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem; max-width: 12rem;">{{ r.address|default:"—"|truncatewords:8 }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.director|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.ogrn|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.account|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem; max-width: 10rem;">{{ r.bank|default:"—"|truncatewords:5 }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.bik|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.kor_account|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.phone|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{{ r.email|default:"—" }}</td>
+            <td style="padding: 0.4rem 0.5rem; text-align: center;">
+                <form method="post" action="{% url 'proposals:counterparties' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Удалить контрагента?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="delete_id" value="{{ r.pk }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Удалить</button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="13" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет контрагентов. Добавьте реквизиты через «Добавление реквизитов» и нажмите «Создать карточку».</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p style="margin-top: 1.5rem;">
+    <a href="{% url 'proposals:requisites_add' %}" class="btn">Добавление реквизитов</a>
+</p>
+</div>
+<style>
+.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+@media (max-width: 992px) {
+    .table-filters { display: block; }
+    .table-filters tr { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .table-filters td { display: block; flex: 1 1 140px; min-width: 0; }
+    .table-filters td:last-child { flex: 1 1 100%; }
+    .table-tkp-list { font-size: 0.75rem; }
+    .table-tkp-list th, .table-tkp-list td { padding: 0.35rem 0.4rem; }
+}
+</style>
+{% endblock %}

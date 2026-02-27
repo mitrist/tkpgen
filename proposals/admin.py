@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Region, RegionServicePrice, Service, TKPRecord
+from .models import Counterparty, Region, RegionServicePrice, Service, TKPRecord
 
 
 @admin.register(Region)
@@ -24,3 +24,9 @@ class TKPRecordAdmin(admin.ModelAdmin):
     list_display = ['number', 'date', 'client', 'service', 'sum_total']
     list_filter = ['date', 'service']
     search_fields = ['number', 'client']
+
+
+@admin.register(Counterparty)
+class CounterpartyAdmin(admin.ModelAdmin):
+    list_display = ['name', 'inn', 'director', 'created_at']
+    search_fields = ['name', 'inn', 'director']

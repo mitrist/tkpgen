@@ -1,0 +1,233 @@
+{% extends "proposals/base.html" %}
+{% block title %}Реквизиты договора{% endblock %}
+{% block content %}
+<h1>Реквизиты договора</h1>
+<p>ТКП: <strong>{{ tkp.number }}</strong> — {{ tkp.client|default:"—" }} ({{ tkp.service }}). Шаблон: {{ contract_template_file }}</p>
+
+<form method="post" action="">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
+
+    <section style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Основные реквизиты (из ТКП)</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+                <label for="counterparty-search">Заказчик (контрагент)</label>
+                <input type="text" id="counterparty-search" placeholder="Поиск по наименованию или ИНН (минимум 2 символа)..." autocomplete="off" style="width: 100%; padding: 0.4rem; margin-bottom: 0.25rem;">
+                <div id="counterparty-results" style="display: none; border: 1px solid var(--border, #ccc); border-radius: 4px; max-height: 12rem; overflow-y: auto; background: #fff; position: relative; z-index: 10;"></div>
+                <div id="counterparty-selected" style="margin-top: 0.35rem; font-size: 0.9rem; color: var(--text-muted, #666);"></div>
+                <div style="margin-top: 0.25rem; position: absolute; left: -9999px;" aria-hidden="true">{{ form.counterparty }}</div>
+                {% if form.counterparty.errors %}<ul class="errorlist">{{ form.counterparty.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.contract_number.label_tag }}
+                {{ form.contract_number }}
+                {% if form.contract_number.errors %}<ul class="errorlist">{{ form.contract_number.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.date.label_tag }}
+                {{ form.date }}
+                {% if form.date.errors %}<ul class="errorlist">{{ form.date.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.customer_name.label_tag }}
+                {{ form.customer_name }}
+                {% if form.customer_name.errors %}<ul class="errorlist">{{ form.customer_name.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.customer_represented_by.label_tag }}
+                {{ form.customer_represented_by }}
+                {% if form.customer_represented_by.help_text %}<p class="help">{{ form.customer_represented_by.help_text }}</p>{% endif %}
+                {% if form.customer_represented_by.errors %}<ul class="errorlist">{{ form.customer_represented_by.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.customer_represented_by_nominative.label_tag }}
+                {{ form.customer_represented_by_nominative }}
+                {% if form.customer_represented_by_nominative.help_text %}<p class="help">{{ form.customer_represented_by_nominative.help_text }}</p>{% endif %}
+                {% if form.customer_represented_by_nominative.errors %}<ul class="errorlist">{{ form.customer_represented_by_nominative.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.price.label_tag }}
+                {{ form.price }}
+                {% if form.price.errors %}<ul class="errorlist">{{ form.price.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.payment_terms.label_tag }}
+                {{ form.payment_terms }}
+                {% if form.payment_terms.errors %}<ul class="errorlist">{{ form.payment_terms.errors }}</ul>{% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Заказчик (реквизиты в подписи)</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div style="grid-column: 1 / -1;">
+                {{ form.name.label_tag }}
+                {{ form.name }}
+                {% if form.name.errors %}<ul class="errorlist">{{ form.name.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.address.label_tag }}
+                {{ form.address }}
+                {% if form.address.errors %}<ul class="errorlist">{{ form.address.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.inn.label_tag }}
+                {{ form.inn }}
+                {% if form.inn.errors %}<ul class="errorlist">{{ form.inn.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.kpp.label_tag }}
+                {{ form.kpp }}
+                {% if form.kpp.errors %}<ul class="errorlist">{{ form.kpp.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.ogrn.label_tag }}
+                {{ form.ogrn }}
+                {% if form.ogrn.errors %}<ul class="errorlist">{{ form.ogrn.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.account.label_tag }}
+                {{ form.account }}
+                {% if form.account.errors %}<ul class="errorlist">{{ form.account.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.bank.label_tag }}
+                {{ form.bank }}
+                {% if form.bank.errors %}<ul class="errorlist">{{ form.bank.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.bik.label_tag }}
+                {{ form.bik }}
+                {% if form.bik.errors %}<ul class="errorlist">{{ form.bik.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.kor_account.label_tag }}
+                {{ form.kor_account }}
+                {% if form.kor_account.errors %}<ul class="errorlist">{{ form.kor_account.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.email.label_tag }}
+                {{ form.email }}
+                {% if form.email.errors %}<ul class="errorlist">{{ form.email.errors }}</ul>{% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Границы подготовки документации (из ТКП)</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div style="grid-column: 1 / -1;">
+                {{ form.room.label_tag }}
+                {{ form.room }}
+                {% if form.room.errors %}<ul class="errorlist">{{ form.room.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.s.label_tag }}
+                {{ form.s }}
+                {% if form.s.errors %}<ul class="errorlist">{{ form.s.errors }}</ul>{% endif %}
+            </div>
+        </div>
+    </section>
+
+    <div class="actions">
+        <button type="submit" name="format" value="docx" class="btn">Сформировать договор (DOCX)</button>
+        <button type="submit" name="format" value="pdf" class="btn">Сформировать договор (PDF)</button>
+        <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К перечню ТКП</a>
+    </div>
+</form>
+
+<script>
+(function() {
+    var searchUrl = '{% url "proposals:counterparty_search" %}';
+    var jsonUrlTemplate = '{% url "proposals:counterparty_json" 0 %}';
+    var searchInput = document.getElementById('counterparty-search');
+    var resultsDiv = document.getElementById('counterparty-results');
+    var selectedDiv = document.getElementById('counterparty-selected');
+    var selectEl = document.getElementById('id_counterparty');
+    var debounceTimer = null;
+
+    function setFieldValue(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.value = value || '';
+    }
+
+    function fillFormFromCounterparty(data) {
+        setFieldValue('id_customer_name', data.name);
+        setFieldValue('id_customer_represented_by', data.director_genitive);
+        setFieldValue('id_customer_represented_by_nominative', data.director);
+        setFieldValue('id_name', data.name);
+        setFieldValue('id_address', data.address);
+        setFieldValue('id_inn', data.inn);
+        setFieldValue('id_kpp', data.kpp);
+        setFieldValue('id_ogrn', data.ogrn);
+        setFieldValue('id_account', data.account);
+        setFieldValue('id_bank', data.bank);
+        setFieldValue('id_bik', data.bik);
+        setFieldValue('id_kor_account', data.kor_account);
+        setFieldValue('id_email', data.email);
+    }
+
+    function showResults(items) {
+        if (!items.length) {
+            resultsDiv.style.display = 'none';
+            return;
+        }
+        resultsDiv.innerHTML = items.map(function(r) {
+            return '<div class="counterparty-result-item" data-id="' + r.id + '" style="padding: 0.4rem 0.6rem; cursor: pointer; border-bottom: 1px solid #eee;">' +
+                (r.name ? '<strong>' + escapeHtml(r.name) + '</strong>' : '') +
+                (r.inn ? ' <span style="color: #666;">ИНН ' + escapeHtml(r.inn) + '</span>' : '') +
+                '</div>';
+        }).join('');
+        resultsDiv.style.display = 'block';
+        resultsDiv.querySelectorAll('.counterparty-result-item').forEach(function(node) {
+            node.addEventListener('click', function() {
+                var id = this.getAttribute('data-id');
+                selectEl.value = id;
+                searchInput.value = '';
+                resultsDiv.style.display = 'none';
+                selectedDiv.textContent = 'Выбран: ' + (this.textContent.trim() || 'ID ' + id);
+                fetch(jsonUrlTemplate.replace('/0/', '/' + id + '/'))
+                    .then(function(res) { return res.ok ? res.json() : Promise.reject(); })
+                    .then(fillFormFromCounterparty)
+                    .catch(function() {});
+            });
+        });
+    }
+
+    function escapeHtml(s) {
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    searchInput.addEventListener('input', function() {
+        var q = searchInput.value.trim();
+        clearTimeout(debounceTimer);
+        if (q.length < 2) {
+            resultsDiv.style.display = 'none';
+            return;
+        }
+        debounceTimer = setTimeout(function() {
+            fetch(searchUrl + '?q=' + encodeURIComponent(q))
+                .then(function(res) { return res.json(); })
+                .then(function(data) { showResults(data.results || []); })
+                .catch(function() { showResults([]); });
+        }, 250);
+    });
+
+    searchInput.addEventListener('focus', function() {
+        if (searchInput.value.trim().length >= 2 && resultsDiv.innerHTML) resultsDiv.style.display = 'block';
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!resultsDiv.contains(e.target) && e.target !== searchInput) resultsDiv.style.display = 'none';
+    });
+
+    if (selectEl.selectedIndex > 0 && selectEl.options[selectEl.selectedIndex]) {
+        selectedDiv.textContent = 'Выбран: ' + selectEl.options[selectEl.selectedIndex].text;
+    }
+})();
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 from django import forms
-from .models import Region, Service
+from .models import Counterparty, Region, Service
 
 
 class ProposalForm(forms.Form):
@@ -189,6 +189,7 @@ class RequisitesParseForm(forms.Form):
     )
     name = forms.CharField(label='Наименование', max_length=500, required=False)
     inn = forms.CharField(label='ИНН', max_length=12, required=False)
+    kpp = forms.CharField(label='КПП', max_length=9, required=False)
     address = forms.CharField(
         label='Адрес',
         required=False,
@@ -199,4 +200,66 @@ class RequisitesParseForm(forms.Form):
     account = forms.CharField(label='Расчетный счет (р/сч)', max_length=64, required=False)
     bank = forms.CharField(label='Наименование банка (Банк)', max_length=500, required=False)
     bik = forms.CharField(label='БИК', max_length=9, required=False)
+    kor_account = forms.CharField(label='Корр. счет', max_length=64, required=False)
     phone = forms.CharField(label='Телефон', max_length=64, required=False)
+    email = forms.CharField(label='Эл. почта', max_length=255, required=False)
+
+
+class ContractForm(forms.Form):
+    """Реквизиты договора: все поля из ТКП и блок подписи заказчика для проверки."""
+    counterparty = forms.ModelChoiceField(
+        label='Заказчик (контрагент)',
+        queryset=Counterparty.objects.none(),
+        required=True,
+        empty_label='Выберите контрагента',
+    )
+    contract_number = forms.CharField(
+        label='Номер договора',
+        max_length=50,
+        required=False,
+        help_text='Присваивается при формировании: дата_порядковый номер за день',
+    )
+    date = forms.DateField(
+        label='Дата',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        input_formats=['%Y-%m-%d'],
+        required=True,
+    )
+    customer_name = forms.CharField(label='Наименование заказчика', max_length=500, required=True)
+    customer_represented_by = forms.CharField(
+        label='В лице (р.п.)',
+        max_length=255,
+        required=False,
+        help_text='ФИО в родительном падеже — первое вхождение в шаблоне',
+    )
+    customer_represented_by_nominative = forms.CharField(
+        label='В лице (им.п.)',
+        max_length=255,
+        required=False,
+        help_text='ФИО в именительном падеже — второе вхождение в шаблоне',
+    )
+    price = forms.DecimalField(label='Цена договора', max_digits=15, decimal_places=2, required=True)
+    payment_terms = forms.CharField(
+        label='Условия оплаты',
+        max_length=2000,
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 4}),
+    )
+    # Реквизиты в подписи Заказчик
+    name = forms.CharField(label='Наименование (подпись)', max_length=500, required=False)
+    address = forms.CharField(label='Юридический адрес', required=False, widget=forms.Textarea(attrs={'rows': 2}))
+    inn = forms.CharField(label='ИНН', max_length=12, required=False)
+    kpp = forms.CharField(label='КПП', max_length=9, required=False)
+    ogrn = forms.CharField(label='ОГРН', max_length=15, required=False)
+    account = forms.CharField(label='Р/с', max_length=64, required=False)
+    bank = forms.CharField(label='Банк', max_length=500, required=False)
+    bik = forms.CharField(label='БИК', max_length=9, required=False)
+    kor_account = forms.CharField(label='к/с', max_length=64, required=False)
+    email = forms.CharField(label='эл.почта', max_length=255, required=False)
+    # Из ТКП: границы подготовки документации
+    room = forms.CharField(label='Параметры объекта / помещение', required=False, widget=forms.Textarea(attrs={'rows': 2}))
+    s = forms.CharField(label='Площадь / количество', max_length=100, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['counterparty'].queryset = Counterparty.objects.all().order_by('name')

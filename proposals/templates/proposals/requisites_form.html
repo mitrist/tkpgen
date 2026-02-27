@@ -27,6 +27,11 @@
             {% if form.inn.errors %}<ul class="errorlist">{{ form.inn.errors }}</ul>{% endif %}
         </div>
         <div>
+            {{ form.kpp.label_tag }}
+            {{ form.kpp }}
+            {% if form.kpp.errors %}<ul class="errorlist">{{ form.kpp.errors }}</ul>{% endif %}
+        </div>
+        <div>
             {{ form.ogrn.label_tag }}
             {{ form.ogrn }}
             {% if form.ogrn.errors %}<ul class="errorlist">{{ form.ogrn.errors }}</ul>{% endif %}
@@ -47,6 +52,11 @@
             {% if form.phone.errors %}<ul class="errorlist">{{ form.phone.errors }}</ul>{% endif %}
         </div>
         <div>
+            {{ form.email.label_tag }}
+            {{ form.email }}
+            {% if form.email.errors %}<ul class="errorlist">{{ form.email.errors }}</ul>{% endif %}
+        </div>
+        <div>
             {{ form.account.label_tag }}
             {{ form.account }}
             {% if form.account.errors %}<ul class="errorlist">{{ form.account.errors }}</ul>{% endif %}
@@ -55,6 +65,11 @@
             {{ form.bik.label_tag }}
             {{ form.bik }}
             {% if form.bik.errors %}<ul class="errorlist">{{ form.bik.errors }}</ul>{% endif %}
+        </div>
+        <div>
+            {{ form.kor_account.label_tag }}
+            {{ form.kor_account }}
+            {% if form.kor_account.errors %}<ul class="errorlist">{{ form.kor_account.errors }}</ul>{% endif %}
         </div>
         <div style="grid-column: 1 / -1;">
             {{ form.bank.label_tag }}
@@ -75,13 +90,16 @@
     <dl>
         <dt>Наименование</dt><dd>{{ card_data.name|default:"—" }}</dd>
         <dt>ИНН</dt><dd>{{ card_data.inn|default:"—" }}</dd>
+        <dt>КПП</dt><dd>{{ card_data.kpp|default:"—" }}</dd>
         <dt>Адрес</dt><dd>{{ card_data.address|default:"—" }}</dd>
         <dt>Генеральный директор</dt><dd>{{ card_data.director|default:"—" }}</dd>
         <dt>ОГРН</dt><dd>{{ card_data.ogrn|default:"—" }}</dd>
         <dt>Расчетный счет (р/сч)</dt><dd>{{ card_data.account|default:"—" }}</dd>
         <dt>Наименование банка (Банк)</dt><dd>{{ card_data.bank|default:"—" }}</dd>
         <dt>БИК</dt><dd>{{ card_data.bik|default:"—" }}</dd>
+        <dt>Корр. счет</dt><dd>{{ card_data.kor_account|default:"—" }}</dd>
         <dt>Телефон</dt><dd>{{ card_data.phone|default:"—" }}</dd>
+        <dt>Эл. почта</dt><dd>{{ card_data.email|default:"—" }}</dd>
     </dl>
 </div>
 {% endif %}

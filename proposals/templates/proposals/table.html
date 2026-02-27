@@ -59,6 +59,7 @@
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
             <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Договор</th>
             <th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Удалить</th>
         </tr>
     </thead>
@@ -75,6 +76,13 @@
                 <a href="{% url 'proposals:download_file' 'pdf' %}?f={{ r.number|urlencode }}" class="table-file-link">.pdf</a>
                 <a href="{% url 'proposals:download_file' 'docx' %}?f={{ r.number|urlencode }}" class="table-file-link">.docx</a>
             </td>
+            <td style="padding: 0.4rem 0.5rem;">
+                {% if r.service in contract_template_by_service %}
+                <a href="{% url 'proposals:contract_form' r.pk %}" class="btn btn-sm">Сформировать Договор</a>
+                {% else %}
+                —
+                {% endif %}
+            </td>
             <td style="padding: 0.4rem 0.5rem; text-align: center;">
                 <form method="post" action="{% url 'proposals:table' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Удалить эту запись и файлы ТКП?');">
                     {% csrf_token %}
@@ -85,7 +93,7 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="8" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
+            <td colspan="9" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
         </tr>
         {% endfor %}
     </tbody>
