@@ -1,0 +1,33 @@
+<div class="kanban-card-content" style="font-size: 0.9rem;">
+    <section style="margin-bottom: 1rem;">
+        <h3 style="font-size: 0.95rem; margin: 0 0 0.5rem;">ТКП</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted); width: 10rem;">Номер</td><td style="padding: 0.25rem 0;">{{ tkp.number }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Клиент</td><td style="padding: 0.25rem 0;">{{ tkp.client|default:"—" }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Дата</td><td style="padding: 0.25rem 0;">{{ tkp_date_display }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Услуга</td><td style="padding: 0.25rem 0;">{{ service_display }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Сумма</td><td style="padding: 0.25rem 0;">{{ sum_display }} ₽</td></tr>
+        </table>
+    </section>
+    {% if contract %}
+    <section>
+        <h3 style="font-size: 0.95rem; margin: 0 0 0.5rem;">Договор</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted); width: 10rem;">Номер</td><td style="padding: 0.25rem 0;">{{ contract.number }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Дата</td><td style="padding: 0.25rem 0;">{{ contract_date_display }}</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Сумма</td><td style="padding: 0.25rem 0;">{{ contract_sum_display }} ₽</td></tr>
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">Файлы</td>
+                <td style="padding: 0.25rem 0;">
+                    {% if contract.docx_file %}
+                    <a href="{% url 'proposals:contract_download' contract.pk 'docx' %}">.docx</a>
+                    {% endif %}
+                    {% if contract.pdf_file %}
+                    <a href="{% url 'proposals:contract_download' contract.pk 'pdf' %}">.pdf</a>
+                    {% endif %}
+                    {% if not contract.docx_file and not contract.pdf_file %}—{% endif %}
+                </td>
+            </tr>
+        </table>
+    </section>
+    {% endif %}
+</div>

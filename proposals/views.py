@@ -1191,6 +1191,100 @@ def contract_form_view(request, tkp_id):
     })
 
 
+# Канбан: ключи колонок
+KANBAN_COL_DRAFT = 'draft'
+KANBAN_COL_FINAL = 'final'
+KANBAN_COL_CONTRACT_DRAFT = 'contract_draft'
+KANBAN_COL_CONTRACT_FINAL = 'contract_final'
+
+
+@login_required
+@require_http_methods(['GET'])
+def kanban_view(request):
+    """Канбан-доска: Черновик ТКП | Итоговый ТКП | Договор — черновик | Договор сформирован."""
+    tkp_list = list(TKPRecord.objects.order_by('-created_at'))
+    contract_by_tkp = {
+        c.tkp_id: c
+        for c in ContractRecord.objects.filter(tkp__isnull=False).select_related('tkp')
+    }
+    columns_order = [
+        (KANBAN_COL_DRAFT, 'Черновик'),
+        (KANBAN_COL_FINAL, 'Итоговый'),
+        (KANBAN_COL_CONTRACT_DRAFT, 'Договор — черновик'),
+        (KANBAN_COL_CONTRACT_FINAL, 'Договор сформирован'),
+    ]
+    columns = {key: {'title': title, 'cards': [], 'count': 0, 'sum': Decimal(0)} for key, title in columns_order}
+
+    for tkp in tkp_list:
+        contract = contract_by_tkp.get(tkp.pk)
+        if tkp.status == TKPRecord.STATUS_DRAFT:
+            col_key = KANBAN_COL_DRAFT
+        elif tkp.status != TKPRecord.STATUS_FINAL:
+            col_key = KANBAN_COL_DRAFT
+        elif contract is None:
+            col_key = KANBAN_COL_FINAL
+        elif contract.status == ContractRecord.STATUS_DRAFT:
+            col_key = KANBAN_COL_CONTRACT_DRAFT
+        else:
+            col_key = KANBAN_COL_CONTRACT_FINAL
+
+        service_display = 'Комплексное' if tkp.service == 'Комплексное ТКП' else tkp.service
+        sum_val = tkp.sum_total or Decimal(0)
+        card = {
+            'tkp_id': tkp.pk,
+            'tkp_number': tkp.number,
+            'client': tkp.client or '—',
+            'date': tkp.date,
+            'date_display': tkp.date.strftime('%d.%m.%Y'),
+            'service_display': service_display,
+            'sum_total': sum_val,
+            'sum_display': _format_price(sum_val),
+            'contract_id': contract.pk if contract else None,
+        }
+        columns[col_key]['cards'].append(card)
+        columns[col_key]['count'] += 1
+        columns[col_key]['sum'] += sum_val
+
+    columns_list = []
+    for key, title in columns_order:
+        col = columns[key]
+        columns_list.append({
+            'id': key,
+            'title': title,
+            'cards': col['cards'],
+            'count': col['count'],
+            'sum': col['sum'],
+            'sum_display': _format_price(col['sum']),
+        })
+
+    return render(request, 'proposals/kanban.html', {
+        'columns': columns_list,
+    })
+
+
+@login_required
+@require_http_methods(['GET'])
+def kanban_card_detail_view(request, tkp_id):
+    """Данные карточки для модального окна канбана: ТКП + договор (если есть)."""
+    try:
+        tkp = TKPRecord.objects.get(pk=tkp_id)
+    except TKPRecord.DoesNotExist:
+        raise Http404()
+    contract = ContractRecord.objects.filter(tkp_id=tkp_id).select_related('counterparty').first()
+    service_display = 'Комплексное' if tkp.service == 'Комплексное ТКП' else tkp.service
+    ctx = {
+        'tkp': tkp,
+        'contract': contract,
+        'tkp_date_display': tkp.date.strftime('%d.%m.%Y'),
+        'service_display': service_display,
+        'sum_display': _format_price(tkp.sum_total or 0),
+    }
+    if contract:
+        ctx['contract_date_display'] = contract.date.strftime('%d.%m.%Y')
+        ctx['contract_sum_display'] = _format_price(contract.sum_total or 0)
+    return render(request, 'proposals/kanban_card_content.html', ctx)
+
+
 @login_required
 @require_http_methods(['GET'])
 def contract_table_view(request):

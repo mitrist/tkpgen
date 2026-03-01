@@ -121,6 +121,7 @@
                     <a href="{% url 'proposals:service_descriptions' %}" {% if request.resolver_match.url_name == 'service_descriptions' %}class="nav-active"{% endif %}>Редактирование описания услуги</a>
                 </div>
             </div>
+            <a href="{% url 'proposals:kanban' %}" {% if request.resolver_match.url_name == 'kanban' %}class="nav-active"{% endif %}>Канбан</a>
             <div class="nav-section" data-nav-section="contract">
                 <div class="nav-section-title">Контрагенты</div>
                 <div class="nav-section-items">
@@ -154,6 +155,7 @@
                         <a href="{% url 'proposals:service_descriptions' %}" {% if request.resolver_match.url_name == 'service_descriptions' %}class="nav-active"{% endif %}>Редактирование описания услуги</a>
                     </div>
                 </div>
+                <a href="{% url 'proposals:kanban' %}" {% if request.resolver_match.url_name == 'kanban' %}class="nav-active"{% endif %}>Канбан</a>
                 <div class="nav-section" data-nav-section="contract">
                     <div class="nav-section-title">Контрагенты</div>
                     <div class="nav-section-items">

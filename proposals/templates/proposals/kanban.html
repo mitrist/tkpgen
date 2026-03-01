@@ -1,0 +1,124 @@
+{% extends "proposals/base.html" %}
+{% load proposal_filters %}
+{% block title %}Канбан{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<h1 style="margin-bottom: 1rem;">Канбан</h1>
+<div class="kanban-board" style="display: flex; gap: 1rem; overflow-x: auto; min-height: 400px; padding-bottom: 0.5rem;">
+    {% for col in columns %}
+    <div class="kanban-column" data-column-id="{{ col.id }}" style="flex: 0 0 280px; min-width: 280px; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column;">
+        <div class="kanban-column-header" style="margin-bottom: 0.75rem;">
+            <h2 style="font-size: 1rem; margin: 0 0 0.5rem; font-weight: 600;">{{ col.title }}</h2>
+            <p style="margin: 0; font-size: 0.8125rem; color: var(--text-muted);">Всего сделок: {{ col.count }}</p>
+            <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--text-muted);">Сумма сделок: {{ col.sum_display }} ₽</p>
+        </div>
+        <div class="kanban-column-cards" style="flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 0.5rem;">
+            {% for card in col.cards %}
+            <div class="kanban-card" data-tkp-id="{{ card.tkp_id }}" data-column-id="{{ col.id }}" draggable="true"
+                 style="background: #fff; border-radius: 6px; padding: 0.6rem 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,.06); cursor: grab; font-size: 0.8125rem; border: 1px solid rgba(0,0,0,.06);">
+                <div class="kanban-card-number" style="font-weight: 600; margin-bottom: 0.25rem;">{{ card.tkp_number }}</div>
+                <div class="kanban-card-client" style="color: var(--text-muted); margin-bottom: 0.2rem;">{{ card.client }}</div>
+                <div class="kanban-card-meta" style="font-size: 0.75rem; color: var(--text-muted);">
+                    {{ card.date_display }} · {{ card.service_display }}
+                </div>
+                <div class="kanban-card-sum" style="margin-top: 0.35rem; font-weight: 500;">{{ card.sum_display }} ₽</div>
+            </div>
+            {% empty %}
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0;">Нет карточек</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="kanban-card-modal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-box" style="background: var(--card, #fff); border-radius: 8px; max-width: 90%; max-height: 90vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <div class="modal-header" style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 600;">Карточка</span>
+            <button type="button" class="btn btn-secondary btn-sm modal-close" aria-label="Закрыть">Закрыть</button>
+        </div>
+        <div class="modal-body" style="padding: 1rem; max-height: 70vh; overflow-y: auto;"></div>
+    </div>
+</div>
+
+<style>
+.kanban-column[data-column-id="draft"] { background: #fef9e7 !important; }
+.kanban-column[data-column-id="final"] { background: #e8f4f8 !important; }
+.kanban-column[data-column-id="contract_draft"] { background: #f0e8f5 !important; }
+.kanban-column[data-column-id="contract_final"] { background: #e8f5e9 !important; }
+.kanban-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+.kanban-card.dragging { opacity: 0.6; cursor: grabbing; }
+.kanban-column-cards.drag-over { background: rgba(255,255,255,.5); border-radius: 6px; min-height: 60px; }
+.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+</style>
+
+<script>
+(function() {
+    var modal = document.getElementById('kanban-card-modal');
+    var body = modal && modal.querySelector('.modal-body');
+    var closeBtn = modal && modal.querySelector('.modal-close');
+    var cardDetailUrl = '{% url "proposals:kanban_card_detail" 0 %}';
+
+    function showModal(html) {
+        if (body) body.innerHTML = html;
+        if (modal) modal.style.display = 'flex';
+    }
+    function hideModal() {
+        if (modal) modal.style.display = 'none';
+    }
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) hideModal();
+        });
+    }
+    if (closeBtn) closeBtn.addEventListener('click', hideModal);
+
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest && e.target.closest('.kanban-card');
+        if (!card || !card.dataset.tkpId) return;
+        e.preventDefault();
+        var url = cardDetailUrl.replace('/0/', '/' + card.dataset.tkpId + '/');
+        fetch(url)
+            .then(function(r) { return r.text(); })
+            .then(showModal)
+            .catch(function() { showModal('<p>Не удалось загрузить карточку.</p>'); });
+    });
+
+    var draggedCard = null;
+    var sourceColumn = null;
+    document.querySelectorAll('.kanban-card').forEach(function(card) {
+        card.addEventListener('dragstart', function(e) {
+            draggedCard = card;
+            sourceColumn = card.closest('.kanban-column-cards');
+            e.dataTransfer.setData('text/plain', card.dataset.tkpId);
+            e.dataTransfer.effectAllowed = 'move';
+            card.classList.add('dragging');
+        });
+        card.addEventListener('dragend', function() {
+            if (draggedCard) draggedCard.classList.remove('dragging');
+            draggedCard = null;
+            document.querySelectorAll('.kanban-column-cards').forEach(function(c) { c.classList.remove('drag-over'); });
+        });
+    });
+    document.querySelectorAll('.kanban-column-cards').forEach(function(columnEl) {
+        columnEl.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            columnEl.classList.add('drag-over');
+        });
+        columnEl.addEventListener('dragleave', function() {
+            columnEl.classList.remove('drag-over');
+        });
+        columnEl.addEventListener('drop', function(e) {
+            e.preventDefault();
+            columnEl.classList.remove('drag-over');
+            if (!draggedCard || !sourceColumn) return;
+            if (sourceColumn !== columnEl) {
+                columnEl.appendChild(draggedCard);
+            }
+            draggedCard = null;
+        });
+    });
+})();
+</script>
+{% endblock %}
