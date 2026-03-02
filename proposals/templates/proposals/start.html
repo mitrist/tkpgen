@@ -3,9 +3,11 @@
 {% block title %}Старт{% endblock %}
 {% block main_extra_class %}main--start{% endblock %}
 {% block main_content %}
+{# Абсолютный URL статики помогает при деплое за прокси (Nginx), когда относительный путь к картинке может теряться #}
 <div class="start-page-bg" role="presentation" style="
     min-height: calc(100vh - 0px);
-    background-image: url('{% static 'main.png' %}');
+    background-color: #100E1C;
+    background-image: url('{{ request.scheme }}://{{ request.get_host }}{% static 'main.png' %}');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

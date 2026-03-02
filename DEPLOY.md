@@ -71,11 +71,12 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Статика и логотипы
-# Перед collectstatic убедитесь, что в проекте есть файлы логотипов (иначе после деплоя они не отображаются):
-# - logo.png — логотип в шапке и сайдбаре (положите в папку images/ или static/ в корне проекта);
-# - plk_logo.png — логотип в подвале сайдбара (папка images/ или static/).
-# Папки images/ и static/ подхватываются через STATICFILES_DIRS и попадают в staticfiles/ при collectstatic.
+# Статика, логотипы и фон страницы «Старт»
+# Перед collectstatic убедитесь, что в корне проекта есть папка images/ (или static/) с файлами:
+# - logo.png — логотип в шапке и сайдбаре;
+# - plk_logo.png — логотип в подвале сайдбара;
+# - main.png — фоновое изображение страницы «Старт».
+# Если этих файлов нет, после деплоя они не отображаются. Папки images/ и static/ подхватываются через STATICFILES_DIRS и попадают в staticfiles/ при collectstatic.
 python manage.py collectstatic --noinput
 
 # Миграции
@@ -382,12 +383,12 @@ git reset --hard origin/main
 1. На VM убедитесь, что подтянулся новый код: `grep -l "topbar" /home/mitrist12/tkp_generator/proposals/templates/proposals/base.html` — должна вывести путь к файлу.
 2. На телефоне: закройте вкладку с сайтом, откройте заново или откройте в режиме «Инкогнито» / «Приватный режим», чтобы не использовать кэш.
 
-**Если после деплоя на VM не отображаются логотипы (в шапке, сайдбаре, подвале):**
-1. В корне проекта должны быть файлы `logo.png` и `plk_logo.png` — положите их в папку `images/` (или `static/`) и закоммитьте в репозиторий или скопируйте на VM вручную.
+**Если после деплоя на VM не отображаются логотипы или фоновое изображение страницы «Старт»:**
+1. В корне проекта должны быть файлы в папке `images/` (или `static/`): `logo.png`, `plk_logo.png`, `main.png` (фон страницы Старт). Закоммитьте их в репозиторий или скопируйте на VM вручную (например через `scp`).
 2. В `settings.py` задано `STATIC_URL = '/static/'` (с начальным слэшем), чтобы ссылки на статику были вида `/static/logo.png`.
 3. После добавления файлов выполните на VM: `cd /home/mitrist12/tkp_generator && source venv/bin/activate && python manage.py collectstatic --noinput`.
 4. В конфиге Nginx в `location /static/` директива `alias` должна указывать на каталог `staticfiles` со слэшем в конце: `alias /home/mitrist12/tkp_generator/staticfiles/`.
-5. Проверьте в браузере прямой запрос: `https://ваш-домен/static/logo.png` — должен отдаваться файл (код 200).
+5. Проверьте в браузере прямые запросы: `https://ваш-домен/static/logo.png`, `https://ваш-домен/static/main.png` — должны отдаваться файлы (код 200). Если 404 — статика не собрана или Nginx смотрит не в тот каталог.
 
 ### Локально (Windows)
 
