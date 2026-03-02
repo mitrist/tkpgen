@@ -1,0 +1,21 @@
+{% extends "proposals/base.html" %}
+{% block title %}Инструкция пользователя{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<div class="instruction-content" style="max-width: 56rem;">
+    {{ instruction_html|safe }}
+</div>
+<style>
+.instruction-content h1 { font-size: 1.5rem; margin: 0 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+.instruction-content h2 { font-size: 1.2rem; margin: 1.5rem 0 0.75rem; color: var(--text); }
+.instruction-content h3 { font-size: 1.05rem; margin: 1rem 0 0.5rem; }
+.instruction-content p { margin: 0 0 0.75rem; }
+.instruction-content ul, .instruction-content ol { margin: 0 0 1rem; padding-left: 1.5rem; }
+.instruction-content li { margin-bottom: 0.35rem; }
+.instruction-content hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.instruction-content table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1rem; font-size: 0.9rem; }
+.instruction-content th, .instruction-content td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
+.instruction-content th { background: #f3f4f6; font-weight: 600; }
+.instruction-content strong { font-weight: 600; }
+</style>
+{% endblock %}

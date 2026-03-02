@@ -17,6 +17,7 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
+import markdown
 from docxtpl import DocxTemplate
 
 from .forms import ComplexProposalForm, ContractForm, ProposalForm, RequisitesParseForm, SROK_CHOICES, TariffForm
@@ -216,6 +217,19 @@ def _build_proposal_data_from_form_cleaned(data):
 def start_view(request):
     """Стартовая страница: фон main.png и боковое меню."""
     return render(request, 'proposals/start.html')
+
+
+@login_required
+@require_http_methods(['GET'])
+def instruction_view(request):
+    """Страница инструкции пользователя: содержимое docs/ИНСТРУКЦИЯ_ПОЛЬЗОВАТЕЛЯ.md в Markdown."""
+    path = settings.BASE_DIR / 'docs' / 'ИНСТРУКЦИЯ_ПОЛЬЗОВАТЕЛЯ.md'
+    if path.exists():
+        content = path.read_text(encoding='utf-8')
+        instruction_html = markdown.markdown(content, extensions=['extra'])
+    else:
+        instruction_html = '<p>Файл инструкции не найден.</p>'
+    return render(request, 'proposals/instruction.html', {'instruction_html': instruction_html})
 
 
 @login_required

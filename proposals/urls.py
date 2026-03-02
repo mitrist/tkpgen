@@ -29,5 +29,6 @@ urlpatterns = [
     path('download-success/', views.download_success_view, name='download_success'),
     path('download/<str:file_type>/', views.download_file_view, name='download_file'),
     path('start/', views.start_view, name='start'),
+    path('instruction/', views.instruction_view, name='instruction'),
     path('', views.form_view, name='form'),
 ]
