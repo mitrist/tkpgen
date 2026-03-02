@@ -5,24 +5,57 @@
 {% block content %}
 <div style="overflow-x: auto;">
 <h1>Реестр договоров</h1>
+<form method="get" action="{% url 'proposals:contract_table' %}" class="summary" style="margin-bottom: 1rem;">
+    <p style="margin: 0 0 0.5rem; font-weight: 600; font-size: 0.9rem;">Фильтры</p>
+    <table class="table-filters" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+        <tr>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_client" style="font-size: 0.75rem;">Клиент</label>
+                <input type="text" name="client" id="id_client" value="{{ filters.client }}" placeholder="часть названия" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_service" style="font-size: 0.75rem;">Услуга</label>
+                <select name="service" id="id_service" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+                    <option value="">Все</option>
+                    {% for sv in services_list %}
+                    <option value="{{ sv }}" {% if filters.service == sv %}selected{% endif %}>{{ sv }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
+                <label for="id_status" style="font-size: 0.75rem;">Статус</label>
+                <select name="status" id="id_status" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
+                    <option value="">Все</option>
+                    <option value="draft" {% if filters.status == 'draft' %}selected{% endif %}>Сохранен черновик</option>
+                    <option value="final" {% if filters.status == 'final' %}selected{% endif %}>Договор сформирован</option>
+                </select>
+            </td>
+            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom; white-space: nowrap;">
+                <button type="submit" class="btn btn-sm">Применить</button>
+                <a href="{% url 'proposals:contract_table' %}" class="btn btn-secondary btn-sm" style="margin-left: 0.2rem;">Сбросить</a>
+            </td>
+        </tr>
+    </table>
+</form>
 <table class="table-contract-list" style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8125rem;">
     <thead>
         <tr style="border-bottom: 2px solid var(--border);">
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер документа</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
-            <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=date&order={% if sort == 'date' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Дата {% if sort == 'date' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=number&order={% if sort == 'number' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Номер документа {% if sort == 'number' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=client&order={% if sort == 'client' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Клиент {% if sort == 'client' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=service&order={% if sort == 'service' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Услуга {% if sort == 'service' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: right; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=sum_total&order={% if sort == 'sum_total' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Сумма {% if sort == 'sum_total' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=status&order={% if sort == 'status' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Статус договора {% if sort == 'status' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
         </tr>
     </thead>
     <tbody>
         {% for r in records %}
-        <tr style="border-bottom: 1px solid var(--border);" class="{% if r.status == 'draft' %}contract-row-draft{% endif %}">
+        <tr style="border-bottom: 1px solid var(--border);" class="{% if r.status == 'draft' %}contract-row-draft{% else %}contract-row-with-contract{% endif %}">
             <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
             <td style="padding: 0.4rem 0.5rem;">
                 {% if r.status == 'draft' and r.tkp_id %}
-                <a href="{% url 'proposals:contract_form' r.tkp_id %}">{{ r.number }}</a>
+                <a href="{% url 'proposals:contract_form' r.tkp_id %}?contract_draft_id={{ r.pk }}">{{ r.number }}</a>
                 {% else %}
                 {{ r.number }}
                 {% endif %}
@@ -30,6 +63,13 @@
             <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.service|default:"—" }}</td>
             <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+            <td style="padding: 0.4rem 0.5rem;">
+                {% if r.status == 'draft' %}
+                <a href="#" class="btn btn-sm btn-contract-draft btn-contract-card-trigger" data-contract-card="{% url 'proposals:contract_card' r.pk %}">Сохранен черновик</a>
+                {% else %}
+                <a href="#" class="btn btn-sm btn-contract-done btn-contract-card-trigger" data-contract-card="{% url 'proposals:contract_card' r.pk %}">Договор сформирован</a>
+                {% endif %}
+            </td>
             <td style="padding: 0.4rem 0.5rem;">
                 {% if r.docx_file and r.pdf_file %}
                 <a href="{% url 'proposals:contract_download' r.pk 'docx' %}" class="table-file-link">.docx</a>
@@ -41,7 +81,7 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="6" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет договоров</td>
+            <td colspan="8" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет договоров</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -50,9 +90,66 @@
     <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К реестру ТКП</a>
 </p>
 </div>
+<div id="contract-card-modal" class="modal-overlay contract-card-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-box contract-card-modal-box" style="border-radius: 10px; max-height: 90vh; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+        <div class="modal-header" style="padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.2); display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 600; color: #fff;">Карточка договора</span>
+            <button type="button" class="btn btn-secondary btn-sm modal-close" aria-label="Закрыть" style="color: #fff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1);">Закрыть</button>
+        </div>
+        <div class="modal-body contract-card-modal-body" style="padding: 1.25rem; color: #fff;"></div>
+    </div>
+</div>
 <style>
+.th-sort { color: inherit; text-decoration: none; }
+.th-sort:hover { text-decoration: underline; }
 .table-file-link { margin-right: 0.5rem; }
 .table-file-link:last-of-type { margin-right: 0; }
 .contract-row-draft { background-color: #fffde7; }
+.contract-row-with-contract { background-color: #e8f5e9; }
+.btn-contract-done { background-color: #2e7d32; color: #fff; border-color: #2e7d32; }
+.btn-contract-done:hover { background-color: #1b5e20; color: #fff; }
+.btn-contract-draft { background-color: #6b7280; color: #fff; border-color: #6b7280; }
+.btn-contract-draft:hover { background-color: #4b5563; color: #fff; }
+.contract-card-modal-box { width: 50%; min-width: 320px; background: linear-gradient(180deg, #45277B 0%, #331A42 100%); color: #fff; border: 1px solid rgba(255,255,255,0.12); }
+.contract-card-modal-body { color: #fff; }
+.contract-card-modal-body .contract-card-content { color: #fff; }
+.contract-card-modal-body h2, .contract-card-modal-body h3 { color: #fff; }
+.contract-card-modal-body table td { color: #fff; }
+.contract-card-modal-body .contract-card-content td:first-child { color: rgba(255,255,255,0.88); }
+.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+@media (max-width: 992px) {
+    .table-filters tr { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .table-filters td { display: block; flex: 1 1 140px; min-width: 0; }
+    .table-filters td:last-child { flex: 1 1 100%; }
+}
 </style>
+<script>
+(function() {
+    var modal = document.getElementById('contract-card-modal');
+    var body = modal && modal.querySelector('.modal-body');
+    var closeBtn = modal && modal.querySelector('.modal-close');
+    function showModal(html) {
+        if (body) body.innerHTML = html;
+        if (modal) modal.style.display = 'flex';
+    }
+    function hideModal() {
+        if (modal) modal.style.display = 'none';
+    }
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) hideModal();
+        });
+    }
+    if (closeBtn) closeBtn.addEventListener('click', hideModal);
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest && e.target.closest('.btn-contract-card-trigger');
+        if (!btn || !btn.dataset.contractCard) return;
+        e.preventDefault();
+        fetch(btn.dataset.contractCard)
+            .then(function(r) { return r.text(); })
+            .then(showModal)
+            .catch(function() { showModal('<p>Не удалось загрузить карточку.</p>'); });
+    });
+})();
+</script>
 {% endblock %}

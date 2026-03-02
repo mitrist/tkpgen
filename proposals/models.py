@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -171,3 +172,118 @@ class ContractRecord(models.Model):
 
     def __str__(self):
         return self.number
+
+
+class KanbanColumnTitleOverride(models.Model):
+    """Переопределение названия колонки канбана для пользователя."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='kanban_column_title_overrides',
+    )
+    column_key = models.CharField('Ключ колонки', max_length=50)
+    title = models.CharField('Название', max_length=255)
+
+    class Meta:
+        verbose_name = 'Название колонки канбана'
+        verbose_name_plural = 'Названия колонок канбана'
+        unique_together = [['user', 'column_key']]
+
+    def __str__(self):
+        return f'{self.column_key}: {self.title}'
+
+
+class KanbanColumnCustom(models.Model):
+    """Пользовательская колонка канбана."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='kanban_custom_columns',
+    )
+    title = models.CharField('Название', max_length=255)
+    order = models.PositiveSmallIntegerField('Порядок', default=0)
+
+    class Meta:
+        verbose_name = 'Пользовательская колонка канбана'
+        verbose_name_plural = 'Пользовательские колонки канбана'
+        ordering = ['user', 'order', 'pk']
+
+    def __str__(self):
+        return self.title
+
+
+class KanbanCardPosition(models.Model):
+    """Позиция карточки на канбане (в какой колонке показывать)."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='kanban_card_positions',
+    )
+    tkp = models.ForeignKey(
+        TKPRecord,
+        on_delete=models.CASCADE,
+        related_name='kanban_positions',
+    )
+    column_key = models.CharField('Колонка', max_length=64)
+
+    class Meta:
+        verbose_name = 'Позиция карточки канбана'
+        verbose_name_plural = 'Позиции карточек канбана'
+        unique_together = [['user', 'tkp']]
+
+    def __str__(self):
+        return f'{self.tkp_id} → {self.column_key}'
+
+
+class KanbanCardField(models.Model):
+    """Пользовательское доп. поле на карточке канбана."""
+    VALUE_TEXT = 'text'
+    VALUE_NUMBER = 'number'
+    VALUE_TYPE_CHOICES = [
+        (VALUE_TEXT, 'Текст'),
+        (VALUE_NUMBER, 'Число'),
+    ]
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='kanban_card_fields',
+    )
+    tkp = models.ForeignKey(
+        TKPRecord,
+        on_delete=models.CASCADE,
+        related_name='kanban_custom_fields',
+    )
+    name = models.CharField('Название поля', max_length=255)
+    value_type = models.CharField('Тип', max_length=20, choices=VALUE_TYPE_CHOICES, default=VALUE_TEXT)
+    value = models.TextField('Значение', blank=True)
+    order = models.PositiveSmallIntegerField('Порядок', default=0)
+
+    class Meta:
+        verbose_name = 'Доп. поле карточки канбана'
+        verbose_name_plural = 'Доп. поля карточек канбана'
+        ordering = ['order', 'pk']
+        unique_together = [['user', 'tkp', 'name']]
+
+    def __str__(self):
+        return f'{self.name}: {self.value[:50] if self.value else "—"}'
+
+
+class KanbanBoardOrder(models.Model):
+    """Порядок колонок на доске канбана для пользователя (список ключей колонок)."""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='kanban_board_order',
+    )
+    order = models.JSONField(
+        'Порядок колонок',
+        default=list,
+        help_text='Список ключей: draft, final, contract_draft, contract_final, custom_<id>',
+    )
+
+    class Meta:
+        verbose_name = 'Порядок колонок канбана'
+        verbose_name_plural = 'Порядок колонок канбана'
+
+    def __str__(self):
+        return f'Order for {self.user}'

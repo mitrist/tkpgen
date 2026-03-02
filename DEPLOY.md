@@ -384,11 +384,25 @@ git reset --hard origin/main
 2. На телефоне: закройте вкладку с сайтом, откройте заново или откройте в режиме «Инкогнито» / «Приватный режим», чтобы не использовать кэш.
 
 **Если после деплоя на VM не отображаются логотипы или фоновое изображение страницы «Старт»:**
-1. В корне проекта должны быть файлы в папке `images/` (или `static/`): `logo.png`, `plk_logo.png`, `main.png` (фон страницы Старт). Закоммитьте их в репозиторий или скопируйте на VM вручную (например через `scp`).
+1. В корне проекта должны быть файлы в папке `images/` (или `static/`): `logo.png`, `plk_logo.png`, `main.png` (фон страницы Старт). Закоммитьте их в репозиторий или скопируйте на VM вручную (например через `scp`). Лучше хранить их только в `images/`, чтобы не было дубликатов и сообщения collectstatic «4 skipped due to conflict».
 2. В `settings.py` задано `STATIC_URL = '/static/'` (с начальным слэшем), чтобы ссылки на статику были вида `/static/logo.png`.
 3. После добавления файлов выполните на VM: `cd /home/mitrist12/tkp_generator && source venv/bin/activate && python manage.py collectstatic --noinput`.
 4. В конфиге Nginx в `location /static/` директива `alias` должна указывать на каталог `staticfiles` со слэшем в конце: `alias /home/mitrist12/tkp_generator/staticfiles/`.
 5. Проверьте в браузере прямые запросы: `https://ваш-домен/static/logo.png`, `https://ваш-домен/static/main.png` — должны отдаваться файлы (код 200). Если 404 — статика не собрана или Nginx смотрит не в тот каталог.
+
+**Если при открытии статики (логотипы, фон) в браузере — «Ошибка 403» (Forbidden):**  
+Nginx работает от пользователя `www-data` и должен иметь право читать каталог `staticfiles` и все каталоги по пути к нему. Выполните на VM:
+
+```bash
+# Права на обход пути до staticfiles (без этого www-data не «дойдёт» до каталога)
+sudo chmod o+x /home/mitrist12
+sudo chmod o+x /home/mitrist12/tkp_generator
+
+# Права на чтение собранной статики (каталоги: execute, файлы: read)
+sudo chmod -R o+rX /home/mitrist12/tkp_generator/staticfiles
+```
+
+Проверка: снова откройте в браузере `https://ваш-домен/static/logo.png` — должен отдаваться файл (код 200), а не 403.
 
 ### Локально (Windows)
 

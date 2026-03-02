@@ -11,6 +11,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db.models import Max
 from django.http import FileResponse, Http404, JsonResponse
 from django.contrib import messages
 from django.shortcuts import redirect, render
@@ -19,7 +20,19 @@ from django.views.decorators.http import require_http_methods
 from docxtpl import DocxTemplate
 
 from .forms import ComplexProposalForm, ContractForm, ProposalForm, RequisitesParseForm, SROK_CHOICES, TariffForm
-from .models import ContractRecord, Counterparty, Region, RegionServicePrice, Service, TKPRecord
+from .models import (
+    ContractRecord,
+    Counterparty,
+    KanbanBoardOrder,
+    KanbanCardField,
+    KanbanCardPosition,
+    KanbanColumnCustom,
+    KanbanColumnTitleOverride,
+    Region,
+    RegionServicePrice,
+    Service,
+    TKPRecord,
+)
 from .requisites_parser import FIELD_ORDER, parse_requisites_file
 
 COMPLEX_TEMPLATE_NAME = 'Шаблон 9 Комплексное ТКП.docx'
@@ -1274,36 +1287,64 @@ KANBAN_COL_CONTRACT_DRAFT = 'contract_draft'
 KANBAN_COL_CONTRACT_FINAL = 'contract_final'
 
 
+def _kanban_computed_column(tkp, contract):
+    """Вычисляет колонку канбана по статусу ТКП и договора."""
+    if tkp.status == TKPRecord.STATUS_DRAFT:
+        return KANBAN_COL_DRAFT
+    if tkp.status != TKPRecord.STATUS_FINAL:
+        return KANBAN_COL_DRAFT
+    if contract is None:
+        return KANBAN_COL_FINAL
+    if contract.status == ContractRecord.STATUS_DRAFT:
+        return KANBAN_COL_CONTRACT_DRAFT
+    return KANBAN_COL_CONTRACT_FINAL
+
+
 @login_required
 @require_http_methods(['GET'])
 def kanban_view(request):
-    """Канбан-доска: Черновик ТКП | Итоговый ТКП | Договор — черновик | Договор сформирован."""
+    """Канбан-доска с переименованием колонок, пользовательскими колонками и позициями карточек."""
     tkp_list = list(TKPRecord.objects.order_by('-created_at'))
     contract_by_tkp = {
         c.tkp_id: c
         for c in ContractRecord.objects.filter(tkp__isnull=False).select_related('tkp')
     }
-    columns_order = [
-        (KANBAN_COL_DRAFT, 'Черновик'),
-        (KANBAN_COL_FINAL, 'Итоговый'),
-        (KANBAN_COL_CONTRACT_DRAFT, 'Договор — черновик'),
-        (KANBAN_COL_CONTRACT_FINAL, 'Договор сформирован'),
-    ]
-    columns = {key: {'title': title, 'cards': [], 'count': 0, 'sum': Decimal(0)} for key, title in columns_order}
+    default_titles = {
+        KANBAN_COL_DRAFT: 'Черновик',
+        KANBAN_COL_FINAL: 'Итоговый',
+        KANBAN_COL_CONTRACT_DRAFT: 'Договор — черновик',
+        KANBAN_COL_CONTRACT_FINAL: 'Договор сформирован',
+    }
+    title_overrides = {
+        o.column_key: o.title
+        for o in KanbanColumnTitleOverride.objects.filter(user=request.user)
+    }
+    custom_columns = list(
+        KanbanColumnCustom.objects.filter(user=request.user).order_by('order', 'pk')
+    )
+    positions = {
+        p.tkp_id: p.column_key
+        for p in KanbanCardPosition.objects.filter(user=request.user)
+    }
+    tkp_ids = [t.pk for t in tkp_list]
+    custom_fields_qs = KanbanCardField.objects.filter(
+        user=request.user, tkp_id__in=tkp_ids
+    ).order_by('tkp_id', 'order', 'pk')
+    custom_fields_by_tkp = {}
+    for f in custom_fields_qs:
+        custom_fields_by_tkp.setdefault(f.tkp_id, []).append({'name': f.name, 'value': f.value or ''})
+
+    all_column_keys = [KANBAN_COL_DRAFT, KANBAN_COL_FINAL, KANBAN_COL_CONTRACT_DRAFT, KANBAN_COL_CONTRACT_FINAL]
+    columns = {key: {'title': title_overrides.get(key) or default_titles[key], 'cards': [], 'count': 0, 'sum': Decimal(0)} for key in all_column_keys}
+    for cc in custom_columns:
+        ckey = f'custom_{cc.pk}'
+        columns[ckey] = {'title': cc.title, 'cards': [], 'count': 0, 'sum': Decimal(0), 'custom_id': cc.pk}
 
     for tkp in tkp_list:
         contract = contract_by_tkp.get(tkp.pk)
-        if tkp.status == TKPRecord.STATUS_DRAFT:
-            col_key = KANBAN_COL_DRAFT
-        elif tkp.status != TKPRecord.STATUS_FINAL:
-            col_key = KANBAN_COL_DRAFT
-        elif contract is None:
-            col_key = KANBAN_COL_FINAL
-        elif contract.status == ContractRecord.STATUS_DRAFT:
-            col_key = KANBAN_COL_CONTRACT_DRAFT
-        else:
-            col_key = KANBAN_COL_CONTRACT_FINAL
-
+        col_key = positions.get(tkp.pk) or _kanban_computed_column(tkp, contract)
+        if col_key not in columns:
+            col_key = _kanban_computed_column(tkp, contract)
         service_display = 'Комплексное' if tkp.service == 'Комплексное ТКП' else tkp.service
         sum_val = tkp.sum_total or Decimal(0)
         card = {
@@ -1316,27 +1357,44 @@ def kanban_view(request):
             'sum_total': sum_val,
             'sum_display': _format_price(sum_val),
             'contract_id': contract.pk if contract else None,
+            'custom_fields': custom_fields_by_tkp.get(tkp.pk, []),
         }
         columns[col_key]['cards'].append(card)
         columns[col_key]['count'] += 1
         columns[col_key]['sum'] += sum_val
 
-    columns_list = []
-    for key, title in columns_order:
-        col = columns[key]
-        columns_list.append({
-            'id': key,
-            'title': title,
-            'cards': col['cards'],
-            'count': col['count'],
-            'sum': col['sum'],
-            'sum_display': _format_price(col['sum']),
-        })
+    default_order = [
+        KANBAN_COL_DRAFT,
+        KANBAN_COL_FINAL,
+        KANBAN_COL_CONTRACT_DRAFT,
+        KANBAN_COL_CONTRACT_FINAL,
+    ] + [f'custom_{cc.pk}' for cc in custom_columns]
+    try:
+        board_order = KanbanBoardOrder.objects.get(user=request.user)
+        saved_order = list(board_order.order) if isinstance(board_order.order, list) else []
+    except KanbanBoardOrder.DoesNotExist:
+        saved_order = []
+    ordered_keys = [k for k in saved_order if k in columns] if saved_order else []
+    for k in default_order:
+        if k not in ordered_keys and k in columns:
+            ordered_keys.append(k)
 
-    column_groups = [
-        {'group_title': 'Текущие ТКП', 'columns': columns_list[:2]},
-        {'group_title': 'Статус договоров', 'columns': columns_list[2:]},
-    ]
+    def col_data(key):
+        c = columns.get(key)
+        if not c:
+            return None
+        return {
+            'id': key,
+            'title': c['title'],
+            'cards': c['cards'],
+            'count': c['count'],
+            'sum': c['sum'],
+            'sum_display': _format_price(c['sum']),
+            'custom_id': c.get('custom_id'),
+        }
+
+    all_columns = [col_data(k) for k in ordered_keys if col_data(k)]
+    column_groups = [{'group_title': '', 'columns': all_columns}]
 
     return render(request, 'proposals/kanban.html', {
         'column_groups': column_groups,
@@ -1346,24 +1404,155 @@ def kanban_view(request):
 @login_required
 @require_http_methods(['GET'])
 def kanban_card_detail_view(request, tkp_id):
-    """Данные карточки для модального окна канбана: ТКП + договор (если есть)."""
+    """Данные карточки для модального окна канбана: ТКП + договор (если есть) + доп. поля."""
     try:
         tkp = TKPRecord.objects.get(pk=tkp_id)
     except TKPRecord.DoesNotExist:
         raise Http404()
     contract = ContractRecord.objects.filter(tkp_id=tkp_id).select_related('counterparty').first()
     service_display = 'Комплексное' if tkp.service == 'Комплексное ТКП' else tkp.service
+    custom_fields = list(
+        KanbanCardField.objects.filter(user=request.user, tkp_id=tkp_id).order_by('order', 'pk')
+    )
     ctx = {
         'tkp': tkp,
         'contract': contract,
         'tkp_date_display': tkp.date.strftime('%d.%m.%Y'),
         'service_display': service_display,
         'sum_display': _format_price(tkp.sum_total or 0),
+        'custom_fields': custom_fields,
     }
     if contract:
         ctx['contract_date_display'] = contract.date.strftime('%d.%m.%Y')
         ctx['contract_sum_display'] = _format_price(contract.sum_total or 0)
     return render(request, 'proposals/kanban_card_content.html', ctx)
+
+
+@login_required
+@require_http_methods(['POST'])
+def kanban_column_title_view(request):
+    """Сохранение переименования колонки канбана (стандартной или пользовательской)."""
+    column_key = (request.POST.get('column_key') or '').strip()
+    title = (request.POST.get('title') or '').strip()
+    if not title:
+        return JsonResponse({'success': False, 'error': 'empty_title'}, status=400)
+    if column_key.startswith('custom_'):
+        try:
+            col_id = int(column_key.replace('custom_', ''))
+            col = KanbanColumnCustom.objects.get(pk=col_id, user=request.user)
+            col.title = title
+            col.save(update_fields=['title'])
+            return JsonResponse({'success': True})
+        except (ValueError, KanbanColumnCustom.DoesNotExist):
+            return JsonResponse({'success': False, 'error': 'not_found'}, status=404)
+    allowed = (KANBAN_COL_DRAFT, KANBAN_COL_FINAL, KANBAN_COL_CONTRACT_DRAFT, KANBAN_COL_CONTRACT_FINAL)
+    if column_key not in allowed:
+        return JsonResponse({'success': False, 'error': 'invalid_column'}, status=400)
+    obj, _ = KanbanColumnTitleOverride.objects.update_or_create(
+        user=request.user,
+        column_key=column_key,
+        defaults={'title': title},
+    )
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(['POST'])
+def kanban_column_reorder_view(request):
+    """Сохранение порядка колонок на канбане (список ключей колонок)."""
+    try:
+        body = request.body.decode('utf-8') if isinstance(request.body, bytes) else (request.body or '[]')
+        order = json.loads(body) if body else []
+    except (ValueError, TypeError, UnicodeDecodeError):
+        order = []
+    if not isinstance(order, list):
+        return JsonResponse({'success': False, 'error': 'invalid'}, status=400)
+    order = [str(k) for k in order if k]
+    KanbanBoardOrder.objects.update_or_create(
+        user=request.user,
+        defaults={'order': order},
+    )
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(['POST'])
+def kanban_column_create_view(request):
+    """Создание пользовательской колонки канбана."""
+    title = (request.POST.get('title') or '').strip()
+    if not title:
+        return JsonResponse({'success': False, 'error': 'empty_title'}, status=400)
+    max_order = KanbanColumnCustom.objects.filter(user=request.user).aggregate(
+        m=Max('order')
+    )['m'] or 0
+    col = KanbanColumnCustom.objects.create(user=request.user, title=title, order=max_order + 1)
+    return JsonResponse({'success': True, 'column_id': col.pk, 'column_key': f'custom_{col.pk}'})
+
+
+@login_required
+@require_http_methods(['POST'])
+def kanban_card_move_view(request):
+    """Перемещение карточки в колонку (сохранение позиции на канбане)."""
+    tkp_id = request.POST.get('tkp_id')
+    column_key = (request.POST.get('column_key') or '').strip()
+    if not tkp_id or not column_key:
+        return JsonResponse({'success': False, 'error': 'missing_params'}, status=400)
+    try:
+        tkp_id = int(tkp_id)
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'invalid_tkp_id'}, status=400)
+    if not TKPRecord.objects.filter(pk=tkp_id).exists():
+        return JsonResponse({'success': False, 'error': 'not_found'}, status=404)
+    if column_key.startswith('custom_'):
+        try:
+            col_id = int(column_key.replace('custom_', ''))
+            if not KanbanColumnCustom.objects.filter(pk=col_id, user=request.user).exists():
+                return JsonResponse({'success': False, 'error': 'invalid_column'}, status=400)
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'invalid_column'}, status=400)
+    else:
+        allowed = (KANBAN_COL_DRAFT, KANBAN_COL_FINAL, KANBAN_COL_CONTRACT_DRAFT, KANBAN_COL_CONTRACT_FINAL)
+        if column_key not in allowed:
+            return JsonResponse({'success': False, 'error': 'invalid_column'}, status=400)
+    KanbanCardPosition.objects.update_or_create(
+        user=request.user,
+        tkp_id=tkp_id,
+        defaults={'column_key': column_key},
+    )
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(['POST'])
+def kanban_card_field_save_view(request, tkp_id):
+    """Добавление или обновление доп. поля карточки канбана."""
+    try:
+        tkp = TKPRecord.objects.get(pk=tkp_id)
+    except TKPRecord.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'not_found'}, status=404)
+    name = (request.POST.get('name') or '').strip()
+    value_type = (request.POST.get('value_type') or 'text').strip().lower()
+    value = (request.POST.get('value') or '').strip()
+    if not name:
+        return JsonResponse({'success': False, 'error': 'empty_name'}, status=400)
+    if value_type not in (KanbanCardField.VALUE_TEXT, KanbanCardField.VALUE_NUMBER):
+        value_type = KanbanCardField.VALUE_TEXT
+    try:
+        field = KanbanCardField.objects.get(user=request.user, tkp_id=tkp_id, name=name)
+        field.value_type = value_type
+        field.value = value
+        field.save(update_fields=['value_type', 'value'])
+    except KanbanCardField.DoesNotExist:
+        max_order = KanbanCardField.objects.filter(user=request.user, tkp_id=tkp_id).aggregate(m=Max('order'))['m'] or 0
+        field = KanbanCardField.objects.create(
+            user=request.user,
+            tkp_id=tkp_id,
+            name=name,
+            value_type=value_type,
+            value=value,
+            order=max_order + 1,
+        )
+    return JsonResponse({'success': True, 'field_id': field.pk})
 
 
 @login_required
@@ -1383,9 +1572,41 @@ def kanban_save_notes_view(request, tkp_id):
 @login_required
 @require_http_methods(['GET'])
 def contract_table_view(request):
-    """Реестр договоров: Дата, Номер, Клиент, Услуга, Сумма, Файлы (docx, pdf)."""
-    records = ContractRecord.objects.select_related('tkp', 'counterparty').order_by('-date', '-created_at')
-    context = {'records': records}
+    """Реестр договоров: фильтры (клиент, услуга, статус), сортировка по всем колонкам, колонка Статус договора."""
+    records = ContractRecord.objects.select_related('tkp', 'counterparty')
+    client = request.GET.get('client', '').strip()
+    service = request.GET.get('service', '').strip()
+    status_filter = request.GET.get('status', '').strip().lower()
+    if client:
+        records = records.filter(client__icontains=client)
+    if service:
+        records = records.filter(service=service)
+    if status_filter == 'draft':
+        records = records.filter(status=ContractRecord.STATUS_DRAFT)
+    elif status_filter == 'final':
+        records = records.filter(status=ContractRecord.STATUS_FINAL)
+    sort_col = request.GET.get('sort', '').strip().lower()
+    order = request.GET.get('order', 'desc').strip().lower()
+    if order not in ('asc', 'desc'):
+        order = 'desc'
+    order_prefix = '' if order == 'asc' else '-'
+    allowed_sort = {'date': 'date', 'number': 'number', 'client': 'client', 'service': 'service', 'sum_total': 'sum_total', 'status': 'status'}
+    if sort_col in allowed_sort:
+        field = allowed_sort[sort_col]
+        if field == 'status':
+            records = records.order_by(f'{order_prefix}status', '-date', '-created_at')
+        else:
+            records = records.order_by(f'{order_prefix}{field}', '-created_at')
+    else:
+        records = records.order_by('-date', '-created_at')
+    services_list = list(ContractRecord.objects.values_list('service', flat=True).distinct().filter(service__isnull=False).exclude(service='').order_by('service'))
+    context = {
+        'records': records,
+        'filters': {'client': client, 'service': service, 'status': status_filter},
+        'services_list': services_list,
+        'sort': sort_col or 'date',
+        'order': order,
+    }
     return render(request, 'proposals/contract_table.html', context)
 
 

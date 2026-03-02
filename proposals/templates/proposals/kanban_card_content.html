@@ -31,6 +31,38 @@
     </section>
     {% endif %}
     <section style="margin-top: 1rem;">
+        <h3 style="font-size: 0.95rem; margin: 0 0 0.5rem;">Доп. поля</h3>
+        {% if custom_fields %}
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 0.75rem;">
+            {% for f in custom_fields %}
+            <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted); width: 10rem;">{{ f.name }}</td><td style="padding: 0.25rem 0;">{{ f.value|default:"—" }}</td></tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+        <form id="kanban-field-form" action="{% url 'proposals:kanban_card_field_save' tkp.pk %}" method="post" data-tkp-id="{{ tkp.pk }}" style="margin-bottom: 1rem;">
+            {% csrf_token %}
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end;">
+                <div>
+                    <label for="kb-field-name" style="font-size: 0.8rem;">Название</label>
+                    <input type="text" name="name" id="kb-field-name" required placeholder="Название поля" style="display: block; padding: 0.35rem 0.5rem; font-size: 0.85rem;">
+                </div>
+                <div>
+                    <label for="kb-field-type" style="font-size: 0.8rem;">Тип</label>
+                    <select name="value_type" id="kb-field-type" style="display: block; padding: 0.35rem 0.5rem; font-size: 0.85rem;">
+                        <option value="text">Текст</option>
+                        <option value="number">Число</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="kb-field-value" style="font-size: 0.8rem;">Значение</label>
+                    <input type="text" name="value" id="kb-field-value" placeholder="Значение" style="display: block; padding: 0.35rem 0.5rem; font-size: 0.85rem;">
+                </div>
+                <button type="submit" class="btn btn-sm">Добавить доп. поле</button>
+            </div>
+        </form>
+        <span id="kanban-field-status" style="font-size: 0.85rem; color: var(--success); display: none;">Сохранено</span>
+    </section>
+    <section style="margin-top: 1rem;">
         <h3 style="font-size: 0.95rem; margin: 0 0 0.5rem;">Заметки</h3>
         <form id="kanban-notes-form" action="{% url 'proposals:kanban_save_notes' tkp.pk %}" method="post" data-tkp-id="{{ tkp.pk }}">
             {% csrf_token %}
@@ -45,27 +77,53 @@
 <script>
 (function() {
     var form = document.getElementById('kanban-notes-form');
-    if (!form) return;
-    var statusEl = document.getElementById('kanban-notes-status');
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        var fd = new FormData(form);
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', form.action);
-        xhr.setRequestHeader('X-CSRFToken', fd.get('csrfmiddlewaretoken'));
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                try {
-                    var r = JSON.parse(xhr.responseText);
-                    if (r.success && statusEl) {
-                        statusEl.style.display = 'inline';
-                        setTimeout(function() { statusEl.style.display = 'none'; }, 2500);
-                    }
-                } catch (err) {}
-            }
-        };
-        xhr.send(fd);
-    });
+    if (form) {
+        var statusEl = document.getElementById('kanban-notes-status');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fd = new FormData(form);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', form.action);
+            xhr.setRequestHeader('X-CSRFToken', fd.get('csrfmiddlewaretoken'));
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        var r = JSON.parse(xhr.responseText);
+                        if (r.success && statusEl) {
+                            statusEl.style.display = 'inline';
+                            setTimeout(function() { statusEl.style.display = 'none'; }, 2500);
+                        }
+                    } catch (err) {}
+                }
+            };
+            xhr.send(fd);
+        });
+    }
+    var fieldForm = document.getElementById('kanban-field-form');
+    if (fieldForm) {
+        var fieldStatus = document.getElementById('kanban-field-status');
+        fieldForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fd = new FormData(fieldForm);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', fieldForm.action);
+            xhr.setRequestHeader('X-CSRFToken', fd.get('csrfmiddlewaretoken'));
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        var r = JSON.parse(xhr.responseText);
+                        if (r.success && fieldStatus) {
+                            fieldStatus.style.display = 'inline';
+                            setTimeout(function() { fieldStatus.style.display = 'none'; }, 2500);
+                            if (window.reloadKanbanCardContent) window.reloadKanbanCardContent();
+                        }
+                    } catch (err) {}
+                }
+            };
+            xhr.send(fd);
+        });
+    }
 })();
 </script>
