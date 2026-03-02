@@ -199,6 +199,13 @@ def _build_proposal_data_from_form_cleaned(data):
 
 
 @login_required
+@require_http_methods(['GET'])
+def start_view(request):
+    """Стартовая страница: фон main.png и боковое меню."""
+    return render(request, 'proposals/start.html')
+
+
+@login_required
 @require_http_methods(['GET', 'POST'])
 def form_view(request):
     """Шаг 1: форма ввода параметров ТКП. GET ?draft_id= — возобновление черновика (простое ТКП)."""
