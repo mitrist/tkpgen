@@ -4,27 +4,34 @@
 {% block container_extra_class %}container--wide{% endblock %}
 {% block content %}
 <h1 style="margin-bottom: 1rem;">Канбан</h1>
-<div class="kanban-board" style="display: flex; gap: 1rem; overflow-x: auto; min-height: 400px; padding-bottom: 0.5rem;">
-    {% for col in columns %}
-    <div class="kanban-column" data-column-id="{{ col.id }}" style="flex: 0 0 280px; min-width: 280px; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column;">
-        <div class="kanban-column-header" style="margin-bottom: 0.75rem;">
-            <h2 style="font-size: 1rem; margin: 0 0 0.5rem; font-weight: 600;">{{ col.title }}</h2>
-            <p style="margin: 0; font-size: 0.8125rem; color: var(--text-muted);">Всего сделок: {{ col.count }}</p>
-            <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--text-muted);">Сумма сделок: {{ col.sum_display }} ₽</p>
-        </div>
-        <div class="kanban-column-cards" style="flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 0.5rem;">
-            {% for card in col.cards %}
-            <div class="kanban-card" data-tkp-id="{{ card.tkp_id }}" data-column-id="{{ col.id }}" draggable="true"
-                 style="background: #fff; border-radius: 6px; padding: 0.6rem 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,.06); cursor: grab; font-size: 0.8125rem; border: 1px solid rgba(0,0,0,.06);">
-                <div class="kanban-card-number" style="font-weight: 600; margin-bottom: 0.25rem;">{{ card.tkp_number }}</div>
-                <div class="kanban-card-client" style="color: var(--text-muted); margin-bottom: 0.2rem;">{{ card.client }}</div>
-                <div class="kanban-card-meta" style="font-size: 0.75rem; color: var(--text-muted);">
-                    {{ card.date_display }} · {{ card.service_display }}
+<div class="kanban-board" style="display: flex; gap: 2rem; overflow-x: auto; min-height: 400px; padding-bottom: 0.5rem; align-items: flex-start;">
+    {% for group in column_groups %}
+    <div class="kanban-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0;">
+        <h2 class="kanban-group-title" style="font-size: 0.9375rem; font-weight: 600; margin: 0 0 0.25rem; color: var(--text-muted); padding: 0 0.25rem;">{{ group.group_title }}</h2>
+        <div class="kanban-group-columns" style="display: flex; gap: 1rem;">
+            {% for col in group.columns %}
+            <div class="kanban-column" data-column-id="{{ col.id }}" style="flex: 0 0 280px; min-width: 280px; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column;">
+                <div class="kanban-column-header" style="margin-bottom: 0.75rem;">
+                    <h3 style="font-size: 1rem; margin: 0 0 0.5rem; font-weight: 600;">{{ col.title }}</h3>
+                    <p style="margin: 0; font-size: 0.8125rem; color: var(--text-muted);">Всего сделок: {{ col.count }}</p>
+                    <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--text-muted);">Сумма сделок: {{ col.sum_display }} ₽</p>
                 </div>
-                <div class="kanban-card-sum" style="margin-top: 0.35rem; font-weight: 500;">{{ card.sum_display }} ₽</div>
+                <div class="kanban-column-cards" style="flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 0.5rem;">
+                    {% for card in col.cards %}
+                    <div class="kanban-card" data-tkp-id="{{ card.tkp_id }}" data-column-id="{{ col.id }}" draggable="true"
+                         style="background: #fff; border-radius: 6px; padding: 0.6rem 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,.06); cursor: grab; font-size: 0.8125rem; border: 1px solid rgba(0,0,0,.06);">
+                        <div class="kanban-card-number" style="font-weight: 600; margin-bottom: 0.25rem;">{{ card.tkp_number }}</div>
+                        <div class="kanban-card-client" style="color: var(--text-muted); margin-bottom: 0.2rem;">{{ card.client }}</div>
+                        <div class="kanban-card-meta" style="font-size: 0.75rem; color: var(--text-muted);">
+                            {{ card.date_display }} · {{ card.service_display }}
+                        </div>
+                        <div class="kanban-card-sum" style="margin-top: 0.35rem; font-weight: 500;">{{ card.sum_display }} ₽</div>
+                    </div>
+                    {% empty %}
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0;">Нет карточек</p>
+                    {% endfor %}
+                </div>
             </div>
-            {% empty %}
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0;">Нет карточек</p>
             {% endfor %}
         </div>
     </div>

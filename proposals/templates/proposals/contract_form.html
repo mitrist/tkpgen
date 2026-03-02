@@ -6,6 +6,7 @@
 
 <form method="post" action="">
     {% csrf_token %}
+    {% if contract_draft_id %}<input type="hidden" name="contract_draft_id" value="{{ contract_draft_id }}">{% endif %}
     {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
 
     <section style="margin-bottom: 1.5rem;">

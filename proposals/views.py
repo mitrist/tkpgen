@@ -972,6 +972,12 @@ def table_view(request):
             status=ContractRecord.STATUS_FINAL, tkp__isnull=False
         ).select_related('tkp')
     }
+    contract_draft_by_tkp = {
+        c.tkp_id: c
+        for c in ContractRecord.objects.filter(
+            status=ContractRecord.STATUS_DRAFT, tkp__isnull=False
+        ).select_related('tkp')
+    }
     context = {
         'records': records,
         'filters': {
@@ -986,6 +992,7 @@ def table_view(request):
         'services_list': services,
         'contract_template_by_service': contract_template_by_service,
         'contract_by_tkp': contract_by_tkp,
+        'contract_draft_by_tkp': contract_draft_by_tkp,
     }
     return render(request, 'proposals/table.html', context)
 
@@ -1011,9 +1018,24 @@ def contract_form_view(request, tkp_id):
         messages.error(request, f'Шаблон договора не найден: {contract_template_file}')
         return redirect('proposals:table')
 
-    # Предзаполнение из ТКП и карточки контрагента
+    # Предзаполнение: из черновика (GET contract_draft_id) или из ТКП и карточки контрагента
+    contract_draft_id = None
+    draft_record = None
+    if request.method != 'POST':
+        draft_id_param = request.GET.get('contract_draft_id')
+        if draft_id_param:
+            try:
+                draft_record = ContractRecord.objects.filter(
+                    pk=draft_id_param,
+                    status=ContractRecord.STATUS_DRAFT,
+                    tkp_id=tkp_id,
+                ).select_related('counterparty').first()
+                if draft_record:
+                    contract_draft_id = draft_record.pk
+            except (ValueError, TypeError):
+                pass
+
     date_str = tkp.date.strftime('%Y-%m-%d')
-    # Номер договора: следующий за датой ТКП (при формировании подставится актуальный по дате из формы)
     next_contract_number = f'{tkp.date:%d%m%Y}_{_get_next_contract_seq_for_date(tkp.date)}'
     initial = {
         'contract_number': next_contract_number,
@@ -1023,15 +1045,23 @@ def contract_form_view(request, tkp_id):
         'room': tkp.room or '',
         's': tkp.s or '',
     }
-    # Контрагент: из GET (возврат из справочника) или по совпадению с клиентом ТКП
+    if draft_record:
+        initial['contract_number'] = draft_record.number
+        initial['date'] = draft_record.date.strftime('%Y-%m-%d')
+        initial['price'] = draft_record.sum_total
+
+    # Контрагент: из черновика, из GET (возврат из справочника) или по совпадению с клиентом ТКП
     cp_for_initial = None
     if request.method != 'POST':
-        cp_id = request.GET.get('counterparty_id')
-        if cp_id:
-            try:
-                cp_for_initial = Counterparty.objects.get(pk=cp_id)
-            except (Counterparty.DoesNotExist, ValueError):
-                pass
+        if draft_record and draft_record.counterparty_id:
+            cp_for_initial = draft_record.counterparty
+        if not cp_for_initial:
+            cp_id = request.GET.get('counterparty_id')
+            if cp_id:
+                try:
+                    cp_for_initial = Counterparty.objects.get(pk=cp_id)
+                except (Counterparty.DoesNotExist, ValueError):
+                    pass
     if not cp_for_initial and tkp.client:
         cp_for_initial = Counterparty.objects.filter(name__icontains=tkp.client).first()
     if not cp_for_initial:
@@ -1080,23 +1110,61 @@ def contract_form_view(request, tkp_id):
                     draft_errors.append('Некорректная дата.')
             if not number_val:
                 draft_errors.append('Укажите номер договора.')
-            elif date_obj and ContractRecord.objects.filter(number=number_val).exists():
-                draft_errors.append('Договор с таким номером уже существует.')
+            else:
+                number_qs = ContractRecord.objects.filter(number=number_val)
+                draft_pk = request.POST.get('contract_draft_id')
+                if draft_pk:
+                    try:
+                        existing_draft = ContractRecord.objects.get(
+                            pk=draft_pk,
+                            status=ContractRecord.STATUS_DRAFT,
+                            tkp=tkp,
+                        )
+                        number_qs = number_qs.exclude(pk=existing_draft.pk)
+                    except (ContractRecord.DoesNotExist, ValueError, TypeError):
+                        pass
+                if date_obj and number_qs.exists():
+                    draft_errors.append('Договор с таким номером уже существует.')
             if not draft_errors and cp and date_obj and number_val:
-                ContractRecord.objects.create(
-                    date=date_obj,
-                    number=number_val,
-                    status=ContractRecord.STATUS_DRAFT,
-                    tkp=tkp,
-                    counterparty=cp,
-                    client=tkp.client or '',
-                    service=tkp.service or '',
-                    sum_total=tkp.sum_total or Decimal(0),
-                )
-                messages.success(request, 'Черновик договора сохранён.')
+                draft_pk = request.POST.get('contract_draft_id')
+                try:
+                    existing_draft = ContractRecord.objects.get(
+                        pk=draft_pk,
+                        status=ContractRecord.STATUS_DRAFT,
+                        tkp=tkp,
+                    )
+                except (ContractRecord.DoesNotExist, ValueError, TypeError):
+                    existing_draft = None
+                if existing_draft:
+                    price_raw = form.data.get('price')
+                    try:
+                        sum_total_val = Decimal(str(price_raw).replace(',', '.')) if price_raw else (tkp.sum_total or Decimal(0))
+                    except (ValueError, TypeError, Exception):
+                        sum_total_val = tkp.sum_total or Decimal(0)
+                    existing_draft.date = date_obj
+                    existing_draft.number = number_val
+                    existing_draft.counterparty = cp
+                    existing_draft.client = tkp.client or ''
+                    existing_draft.service = tkp.service or ''
+                    existing_draft.sum_total = sum_total_val
+                    existing_draft.save()
+                    messages.success(request, 'Черновик договора обновлён.')
+                else:
+                    ContractRecord.objects.create(
+                        date=date_obj,
+                        number=number_val,
+                        status=ContractRecord.STATUS_DRAFT,
+                        tkp=tkp,
+                        counterparty=cp,
+                        client=tkp.client or '',
+                        service=tkp.service or '',
+                        sum_total=tkp.sum_total or Decimal(0),
+                    )
+                    messages.success(request, 'Черновик договора сохранён.')
                 return redirect('proposals:table')
             for err in draft_errors:
                 messages.error(request, err)
+            contract_draft_id = request.POST.get('contract_draft_id')
         elif form.is_valid():
             cd = form.cleaned_data
             cp = cd['counterparty']
@@ -1188,6 +1256,7 @@ def contract_form_view(request, tkp_id):
         'form': form,
         'tkp': tkp,
         'contract_template_file': contract_template_file,
+        'contract_draft_id': contract_draft_id,
     })
 
 
@@ -1257,8 +1326,13 @@ def kanban_view(request):
             'sum_display': _format_price(col['sum']),
         })
 
+    column_groups = [
+        {'group_title': 'Текущие ТКП', 'columns': columns_list[:2]},
+        {'group_title': 'Статус договоров', 'columns': columns_list[2:]},
+    ]
+
     return render(request, 'proposals/kanban.html', {
-        'columns': columns_list,
+        'column_groups': column_groups,
     })
 
 
@@ -1283,6 +1357,20 @@ def kanban_card_detail_view(request, tkp_id):
         ctx['contract_date_display'] = contract.date.strftime('%d.%m.%Y')
         ctx['contract_sum_display'] = _format_price(contract.sum_total or 0)
     return render(request, 'proposals/kanban_card_content.html', ctx)
+
+
+@login_required
+@require_http_methods(['POST'])
+def kanban_save_notes_view(request, tkp_id):
+    """Сохранение заметок по сделке (карточка канбана)."""
+    try:
+        tkp = TKPRecord.objects.get(pk=tkp_id)
+    except TKPRecord.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'not_found'}, status=404)
+    notes = (request.POST.get('notes') or '').strip()
+    tkp.notes = notes
+    tkp.save(update_fields=['notes'])
+    return JsonResponse({'success': True})
 
 
 @login_required

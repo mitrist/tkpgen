@@ -7,6 +7,7 @@ urlpatterns = [
     path('table/', views.table_view, name='table'),
     path('kanban/', views.kanban_view, name='kanban'),
     path('kanban/card/<int:tkp_id>/', views.kanban_card_detail_view, name='kanban_card_detail'),
+    path('kanban/card/<int:tkp_id>/notes/', views.kanban_save_notes_view, name='kanban_save_notes'),
     path('contracts/', views.contract_table_view, name='contract_table'),
     path('contract/<int:tkp_id>/', views.contract_form_view, name='contract_form'),
     path('contract/<int:contract_id>/card/', views.contract_card_view, name='contract_card'),

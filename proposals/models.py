@@ -93,6 +93,7 @@ class TKPRecord(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_FINAL,
     )
+    notes = models.TextField('Заметки по сделке', blank=True, default='')
     created_at = models.DateTimeField('Создано', auto_now_add=True)
 
     class Meta:
