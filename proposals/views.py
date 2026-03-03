@@ -198,6 +198,13 @@ def _build_proposal_data_from_form_cleaned(data):
         if data.get('is_internal')
         else (data.get('client') or '')
     )
+    s_val = data.get('s')
+    if s_val is not None and s_val != '':
+        s_str = str(s_val)
+    elif data.get('is_internal'):
+        s_str = ''
+    else:
+        s_str = str(s)
     return {
         'date': data['date'].strftime('%Y-%m-%d'),
         'service_id': service.pk,
@@ -208,7 +215,7 @@ def _build_proposal_data_from_form_cleaned(data):
         'room': data.get('room') or '',
         'srok': data.get('srok') or '',
         'text': data.get('text') or '',
-        's': '' if data.get('is_internal') else str(s),
+        's': s_str,
     }, None
 
 
@@ -302,6 +309,7 @@ def form_view(request):
                             price_value = rsp.unit_price * Decimal(str(s_float))
                         except RegionServicePrice.DoesNotExist:
                             price_value = Decimal(0)
+                s_draft = form.data.get('s')
                 proposal_data = {
                     'date': date_obj.strftime('%Y-%m-%d'),
                     'service_id': service.pk,
@@ -312,10 +320,8 @@ def form_view(request):
                     'room': (form.data.get('room') or '').strip(),
                     'srok': (form.data.get('srok') or '').strip(),
                     'text': (form.data.get('text') or '').strip(),
-                    's': form.data.get('s') if not is_internal else '',
+                    's': str(s_draft) if s_draft is not None and s_draft != '' else '',
                 }
-                if is_internal:
-                    proposal_data['s'] = ''
                 _save_tkp_record(proposal_data, status=TKPRecord.STATUS_DRAFT)
                 messages.success(request, 'Черновик ТКП сохранён в перечень.')
                 return redirect('proposals:table')
