@@ -1,0 +1,79 @@
+{% extends "proposals/base.html" %}
+{% block title %}Предпросмотр и редактирование черновика договора{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<style>
+.contract-editor-page { max-width: 210mm; margin: 0 auto 1.5rem; }
+.contract-editor-header { margin-bottom: 1rem; }
+.contract-editor-header h1 { font-size: 1.35rem; margin: 0 0 0.5rem; color: var(--text); }
+.contract-editor-header p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+.contract-editor-wrap {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08), 0 0 1px rgba(0,0,0,.06);
+    padding: 1.5rem;
+    min-height: 75vh;
+    border: 1px solid var(--border);
+    overflow: auto;
+}
+.contract-editor-wrap .ck.ck-editor { border: none; min-height: 70vh; }
+.contract-editor-wrap .ck.ck-editor__main > .ck-editor__editable { border: none; border-radius: 0; min-height: 70vh; }
+.contract-editor-wrap .ck.ck-toolbar { border: none; border-bottom: 1px solid var(--border); background: #f9fafb; }
+.contract-editor-wrap .ck-content { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 14pt; line-height: 1.5; color: #000; padding: 1rem; }
+.contract-editor-wrap .ck-content p, .contract-editor-wrap .ck-content div { margin: 0 0 0.75em; text-align: justify; }
+.contract-editor-wrap .ck-content strong, .contract-editor-wrap .ck-content b { font-weight: 700; }
+.contract-editor-wrap .ck-content h1, .contract-editor-wrap .ck-content h2 { font-weight: 700; margin: 1em 0 0.5em; font-size: 14pt; }
+.contract-editor-wrap .ck-content h1 { text-align: center; }
+.contract-editor-wrap .ck-content h2 { text-align: left; margin-top: 1.25em; }
+.contract-editor-wrap .ck-content table { width: 100%; border-collapse: collapse; }
+.contract-editor-wrap .ck-content th, .contract-editor-wrap .ck-content td { border: 1px solid #000; padding: 0.25em 0.5em; }
+.contract-editor-actions { margin-top: 1.25rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+</style>
+
+<div class="contract-editor-page">
+    <div class="contract-editor-header">
+        <h1>Предпросмотр и редактирование черновика договора</h1>
+        <p>ТКП: <strong>{{ tkp.number }}</strong> — {{ tkp.client|default:"—" }} ({{ tkp.service }}). Номер договора: {{ contract_number }}.</p>
+    </div>
+
+    <form method="post" action="{% url 'proposals:contract_save_from_editor' %}" id="contract-editor-form">
+        {% csrf_token %}
+        <div class="contract-editor-wrap">
+            <textarea name="contract_editor_content" id="contract_editor_content">{{ html_content }}</textarea>
+        </div>
+        <div class="contract-editor-actions actions">
+            <button type="submit" class="btn">Сохранить договор</button>
+            <a href="{% url 'proposals:contract_form' tkp.pk %}{% if contract_draft_id %}?contract_draft_id={{ contract_draft_id }}{% endif %}" class="btn btn-secondary">Вернуться к реквизитам</a>
+            <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К реестру ТКП</a>
+        </div>
+    </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@ckeditor/ckeditor5-build-classic@41.3.1/build/ckeditor.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var textarea = document.getElementById('contract_editor_content');
+    if (!textarea) return;
+    if (typeof ClassicEditor === 'undefined') {
+        textarea.placeholder = 'Редактор не загрузился. Проверьте подключение к интернету.';
+        return;
+    }
+    ClassicEditor
+        .create(textarea, {
+            toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|', 'outdent', 'indent', '|', 'blockQuote', 'insertTable', 'undo', 'redo']
+        })
+        .then(function(editor) {
+            window.contractEditor = editor;
+            var form = document.getElementById('contract-editor-form');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    editor.updateSourceElement();
+                });
+            }
+        })
+        .catch(function(err) {
+            console.error('CKEditor:', err);
+        });
+});
+</script>
+{% endblock %}

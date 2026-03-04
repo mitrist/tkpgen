@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import re
@@ -18,6 +19,11 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 import markdown
+import mammoth
+try:
+    import pypandoc_binary as pypandoc
+except ImportError:
+    import pypandoc
 from docxtpl import DocxTemplate
 
 from .forms import ComplexProposalForm, ContractForm, ProposalForm, RequisitesParseForm, SROK_CHOICES, TariffForm
@@ -1205,6 +1211,60 @@ def contract_form_view(request, tkp_id):
             for err in draft_errors:
                 messages.error(request, err)
             contract_draft_id = request.POST.get('contract_draft_id')
+        elif request.POST.get('preview_edit') and form.is_valid():
+            cd = form.cleaned_data
+            cp = cd['counterparty']
+            date_obj = cd['date']
+            price_val = cd['price']
+            seq = _get_next_contract_seq_for_date(date_obj)
+            contract_number = f'{date_obj:%d%m%Y}_{seq}'
+            customer_name = (cd.get('customer_name') or '').strip() or (cp.name or '')
+            customer_represented_by = (cd.get('customer_represented_by') or '').strip()
+            if not customer_represented_by:
+                customer_represented_by = _director_genitive(cp.director or '')
+            customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
+            payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+            ctx = {
+                'contract_number': contract_number,
+                'number': contract_number,
+                'date': date_obj.strftime('%d.%m.%Y'),
+                'customer_name': customer_name,
+                'customer_represented_by': customer_represented_by,
+                'customer_represented_by_nominative': customer_represented_by_nominative,
+                'price': _format_price(price_val),
+                'payment_terms': payment_terms,
+                'name': cd.get('name') or cp.name or '',
+                'address': cd.get('address') or cp.address or '',
+                'inn': cd.get('inn') or cp.inn or '',
+                'kpp': cd.get('kpp') or cp.kpp or '',
+                'ogrn': cd.get('ogrn') or cp.ogrn or '',
+                'account': cd.get('account') or cp.account or '',
+                'bank': cd.get('bank') or cp.bank or '',
+                'bik': cd.get('bik') or cp.bik or '',
+                'kor_account': cd.get('kor_account') or cp.kor_account or '',
+                'email': cd.get('email') or cp.email or '',
+                'room': cd.get('room') or tkp.room or '',
+                's': cd.get('s') or tkp.s or '',
+            }
+            doc = DocxTemplate(str(template_path))
+            doc.render(ctx)
+            buf = io.BytesIO()
+            doc.save(buf)
+            buf.seek(0)
+            try:
+                result = mammoth.convert_to_html(buf)
+                html_content = result.value or '<p>Не удалось преобразовать документ в HTML.</p>'
+            except Exception:
+                html_content = '<p>Ошибка преобразования черновика в HTML. Проверьте шаблон договора.</p>'
+            request.session['contract_editor_html'] = html_content
+            request.session['contract_editor_tkp_id'] = tkp_id
+            request.session['contract_editor_contract_number'] = contract_number
+            request.session['contract_editor_date'] = date_obj.strftime('%Y-%m-%d')
+            request.session['contract_editor_price'] = str(price_val)
+            request.session['contract_editor_counterparty_id'] = cp.pk
+            request.session['contract_editor_draft_id'] = request.POST.get('contract_draft_id') or ''
+            request.session['contract_editor_template_file'] = contract_template_file
+            return redirect('proposals:contract_editor')
         elif form.is_valid():
             cd = form.cleaned_data
             cp = cd['counterparty']
@@ -1298,6 +1358,142 @@ def contract_form_view(request, tkp_id):
         'contract_template_file': contract_template_file,
         'contract_draft_id': contract_draft_id,
     })
+
+
+SESSION_KEY_EDITOR_HTML = 'contract_editor_html'
+SESSION_KEY_EDITOR_TKP_ID = 'contract_editor_tkp_id'
+SESSION_KEY_EDITOR_CONTRACT_NUMBER = 'contract_editor_contract_number'
+SESSION_KEY_EDITOR_DATE = 'contract_editor_date'
+SESSION_KEY_EDITOR_PRICE = 'contract_editor_price'
+SESSION_KEY_EDITOR_COUNTERPARTY_ID = 'contract_editor_counterparty_id'
+SESSION_KEY_EDITOR_DRAFT_ID = 'contract_editor_draft_id'
+SESSION_KEY_EDITOR_TEMPLATE_FILE = 'contract_editor_template_file'
+
+
+@login_required
+@require_http_methods(['GET'])
+def contract_editor_view(request):
+    """Страница предпросмотра и редактирования черновика договора в CKEditor 5."""
+    html_content = request.session.get(SESSION_KEY_EDITOR_HTML)
+    if not html_content:
+        messages.error(request, 'Сессия предпросмотра истекла или не найдена. Заполните реквизиты и нажмите «Предпросмотр и редактирование черновика».')
+        return redirect('proposals:table')
+    tkp_id = request.session.get(SESSION_KEY_EDITOR_TKP_ID)
+    try:
+        tkp = TKPRecord.objects.get(pk=tkp_id)
+    except (TKPRecord.DoesNotExist, ValueError, TypeError):
+        messages.error(request, 'Запись ТКП не найдена.')
+        return redirect('proposals:table')
+    return render(request, 'proposals/contract_editor.html', {
+        'html_content': html_content,
+        'tkp': tkp,
+        'contract_number': request.session.get(SESSION_KEY_EDITOR_CONTRACT_NUMBER, ''),
+        'contract_date': request.session.get(SESSION_KEY_EDITOR_DATE, ''),
+        'contract_price': request.session.get(SESSION_KEY_EDITOR_PRICE, ''),
+        'counterparty_id': request.session.get(SESSION_KEY_EDITOR_COUNTERPARTY_ID) or '',
+        'contract_draft_id': request.session.get(SESSION_KEY_EDITOR_DRAFT_ID) or '',
+    })
+
+
+@login_required
+@require_http_methods(['POST'])
+def contract_save_from_editor_view(request):
+    """Сохранение договора из отредактированного HTML (CKEditor): конвертация в DOCX и запись в реестр."""
+    html_content = (request.POST.get('contract_editor_content') or '').strip()
+    if not html_content:
+        messages.error(request, 'Содержимое договора пусто.')
+        return redirect('proposals:table')
+    tkp_id = request.session.get(SESSION_KEY_EDITOR_TKP_ID)
+    contract_number = (request.session.get(SESSION_KEY_EDITOR_CONTRACT_NUMBER) or '').strip()
+    date_str = request.session.get(SESSION_KEY_EDITOR_DATE) or ''
+    price_str = request.session.get(SESSION_KEY_EDITOR_PRICE) or '0'
+    counterparty_id = request.session.get(SESSION_KEY_EDITOR_COUNTERPARTY_ID)
+    if not tkp_id or not contract_number or not date_str:
+        messages.error(request, 'Сессия предпросмотра истекла. Повторите ввод реквизитов и предпросмотр.')
+        return redirect('proposals:table')
+    try:
+        tkp = TKPRecord.objects.get(pk=tkp_id)
+    except (TKPRecord.DoesNotExist, ValueError, TypeError):
+        messages.error(request, 'Запись ТКП не найдена.')
+        return redirect('proposals:table')
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Некорректная дата.')
+        return redirect('proposals:table')
+    try:
+        price_val = Decimal(price_str.replace(',', '.'))
+    except (ValueError, TypeError):
+        price_val = tkp.sum_total or Decimal(0)
+    try:
+        cp = Counterparty.objects.get(pk=counterparty_id)
+    except (Counterparty.DoesNotExist, ValueError, TypeError):
+        messages.error(request, 'Контрагент не найден.')
+        return redirect('proposals:table')
+    out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    file_base = f'Дог_{contract_number}'
+    docx_path = out_dir / f'{file_base}.docx'
+
+    templates_dir = Path(getattr(settings, 'TEMPLATES_DOCX_DIR', settings.BASE_DIR / 'templates_docx'))
+    template_filename = request.session.get(SESSION_KEY_EDITOR_TEMPLATE_FILE)
+    reference_doc = templates_dir / template_filename if template_filename else None
+    extra_args = []
+    if reference_doc and reference_doc.exists():
+        extra_args.append('--reference-doc=' + str(reference_doc))
+
+    def _html_to_docx():
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+            f.write(html_content)
+            html_path = f.name
+        try:
+            pypandoc.convert_file(html_path, 'docx', format='html', outputfile=str(docx_path), extra_args=extra_args)
+        finally:
+            try:
+                os.unlink(html_path)
+            except OSError:
+                pass
+
+    try:
+        _html_to_docx()
+    except OSError as e:
+        err_msg = str(e)
+        if 'pandoc' in err_msg.lower() and hasattr(pypandoc, 'download_pandoc'):
+            try:
+                pypandoc.download_pandoc()
+                _html_to_docx()
+            except Exception as e2:
+                messages.error(request, f'Не удалось сформировать DOCX: {e2}. Установите Pandoc (https://pandoc.org) или используйте пакет pypandoc-binary.')
+                return redirect('proposals:contract_editor')
+        else:
+            messages.error(request, f'Не удалось сформировать DOCX из текста: {e}. Установите Pandoc (https://pandoc.org) или установите пакет: pip install pypandoc-binary')
+            return redirect('proposals:contract_editor')
+    except Exception as e:
+        messages.error(request, f'Не удалось сформировать DOCX из текста: {e}. Установите Pandoc (https://pandoc.org).')
+        return redirect('proposals:contract_editor')
+    ContractRecord.objects.create(
+        date=date_obj,
+        number=contract_number,
+        status=ContractRecord.STATUS_FINAL,
+        tkp=tkp,
+        counterparty=cp,
+        client=tkp.client or '',
+        service=tkp.service or '',
+        sum_total=price_val,
+        docx_file=file_base,
+        pdf_file=file_base,
+        contract_snapshot={},
+    )
+    for key in (SESSION_KEY_EDITOR_HTML, SESSION_KEY_EDITOR_TKP_ID, SESSION_KEY_EDITOR_CONTRACT_NUMBER,
+                SESSION_KEY_EDITOR_DATE, SESSION_KEY_EDITOR_PRICE, SESSION_KEY_EDITOR_COUNTERPARTY_ID,
+                SESSION_KEY_EDITOR_DRAFT_ID, SESSION_KEY_EDITOR_TEMPLATE_FILE):
+        request.session.pop(key, None)
+    messages.success(request, 'Договор сохранён.')
+    return FileResponse(
+        open(docx_path, 'rb'),
+        as_attachment=True,
+        filename=f'{file_base}.docx',
+    )
 
 
 # Канбан: ключи колонок

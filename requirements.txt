@@ -4,4 +4,6 @@ docxtpl>=0.16.0
 docxcompose>=1.4.0
 gunicorn>=21.0
 pypdf>=4.0.0
+mammoth>=1.6
+pypandoc-binary>=1.11
 
