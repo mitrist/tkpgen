@@ -37,9 +37,16 @@
         </tr>
     </table>
 </form>
-<table class="table-contract-list" style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8125rem;">
+<form id="bulk-form-contract" method="post" action="{% url 'proposals:contract_table' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">
+{% csrf_token %}
+<div class="bulk-toolbar" style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+    <button type="submit" name="bulk_action" value="delete" class="btn btn-secondary btn-sm" onclick="var n=document.querySelectorAll('#bulk-form-contract input[name=ids]:checked').length;return n?confirm('Удалить выбранные записи договоров и их файлы?'):false;">Удалить выбранные</button>
+    <button type="submit" name="bulk_action" value="copy" class="btn btn-secondary btn-sm" onclick="var n=document.querySelectorAll('#bulk-form-contract input[name=ids]:checked').length;if(!n){alert('Выберите строки для копирования.');return false;}return true;">Копировать выбранные</button>
+</div>
+<table class="table-contract-list" style="width: 100%; border-collapse: collapse; margin-top: 0; font-size: 0.8125rem;">
     <thead>
         <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: center; padding: 0.4rem 0.5rem; width: 2.5rem;"><input type="checkbox" id="contract-select-all" title="Выбрать все" aria-label="Выбрать все"></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=date&order={% if sort == 'date' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Дата {% if sort == 'date' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=number&order={% if sort == 'number' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Номер документа {% if sort == 'number' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=client&order={% if sort == 'client' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Клиент {% if sort == 'client' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
@@ -48,11 +55,13 @@
             <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=status&order={% if sort == 'status' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Статус договора {% if sort == 'status' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Владелец</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
+            <th style="text-align: center; padding: 0.4rem 0.5rem;">Удалить</th>
         </tr>
     </thead>
     <tbody>
         {% for r in records %}
         <tr style="border-bottom: 1px solid var(--border);" class="{% if r.status == 'draft' %}contract-row-draft{% else %}contract-row-with-contract{% endif %}">
+            <td style="padding: 0.4rem 0.5rem; text-align: center;"><input type="checkbox" name="ids" value="{{ r.pk }}" form="bulk-form-contract" class="contract-row-cb"></td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
             <td style="padding: 0.4rem 0.5rem;">
                 {% if r.status == 'draft' and r.tkp_id %}
@@ -80,14 +89,31 @@
                 —
                 {% endif %}
             </td>
+            <td style="padding: 0.4rem 0.5rem; text-align: center;">
+                <form method="post" action="{% url 'proposals:contract_table' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Удалить эту запись договора и файлы?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="delete_id" value="{{ r.pk }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Удалить</button>
+                </form>
+            </td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="9" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет договоров</td>
+            <td colspan="11" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет договоров</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</form>
+<script>
+(function(){
+    var selectAll = document.getElementById('contract-select-all');
+    var checkboxes = document.querySelectorAll('.contract-row-cb');
+    if (selectAll && checkboxes.length) {
+        selectAll.addEventListener('change', function(){ checkboxes.forEach(function(cb){ cb.checked = selectAll.checked; }); });
+    }
+})();
+</script>
 <p style="margin-top: 1.5rem;">
     <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К реестру ТКП</a>
 </p>

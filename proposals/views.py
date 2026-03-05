@@ -1115,6 +1115,58 @@ def _delete_tkp_files(base_name):
 def table_view(request):
     """Страница перечня сформированных ТКП с фильтрами по каждому столбцу; удаление записей."""
     if request.method == 'POST':
+        q = request.GET.urlencode()
+        url = reverse('proposals:table') + ('?' + q if q else '')
+        bulk_ids = request.POST.getlist('ids')
+        bulk_action = (request.POST.get('bulk_action') or '').strip()
+
+        if bulk_action == 'delete' and bulk_ids:
+            deleted = 0
+            for pk in bulk_ids:
+                try:
+                    rec = TKPRecord.objects.get(pk=pk)
+                    base_name = rec.number
+                    rec.delete()
+                    if base_name:
+                        _delete_tkp_files(base_name)
+                    deleted += 1
+                except (TKPRecord.DoesNotExist, ValueError, TypeError):
+                    pass
+            if deleted:
+                messages.success(request, f'Удалено записей: {deleted}.')
+            return redirect(url)
+
+        if bulk_action == 'copy' and bulk_ids:
+            copied = 0
+            for pk in bulk_ids:
+                try:
+                    rec = TKPRecord.objects.get(pk=pk)
+                    if rec.status == TKPRecord.STATUS_DRAFT:
+                        seq = _get_next_draft_seq_for_date(rec.date)
+                        new_number = _generate_draft_number(rec.date, seq)
+                    else:
+                        seq = _get_next_seq_for_date(rec.date)
+                        new_number = _generate_doc_number(rec.client or '', rec.date, seq)
+                    TKPRecord.objects.create(
+                        date=rec.date,
+                        number=new_number,
+                        client=rec.client or '',
+                        service=rec.service or '',
+                        sum_total=rec.sum_total or Decimal(0),
+                        room=rec.room or '',
+                        s=rec.s or '',
+                        text=rec.text or '',
+                        status=rec.status,
+                        rows_json=rec.rows_json,
+                        created_by=request.user,
+                    )
+                    copied += 1
+                except (TKPRecord.DoesNotExist, ValueError, TypeError):
+                    pass
+            if copied:
+                messages.success(request, f'Скопировано записей: {copied}.')
+            return redirect(url)
+
         delete_id = request.POST.get('delete_id', '').strip()
         if delete_id:
             try:
@@ -1125,9 +1177,7 @@ def table_view(request):
                 messages.success(request, 'Запись удалена.')
             except TKPRecord.DoesNotExist:
                 messages.error(request, 'Запись не найдена.')
-        q = request.GET.urlencode()
-        url = reverse('proposals:table') + ('?' + q if q else '')
-        return redirect(url)
+            return redirect(url)
     records = TKPRecord.objects.select_related('created_by').all()
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()
@@ -2049,9 +2099,71 @@ def kanban_save_notes_view(request, tkp_id):
 
 
 @login_required
-@require_http_methods(['GET'])
+@require_http_methods(['GET', 'POST'])
 def contract_table_view(request):
-    """Реестр договоров: фильтры (клиент, услуга, статус), сортировка по всем колонкам, колонка Статус договора."""
+    """Реестр договоров: фильтры (клиент, услуга, статус), сортировка по всем колонкам, колонка Статус договора; удаление записей."""
+    if request.method == 'POST':
+        q = request.GET.urlencode()
+        url = reverse('proposals:contract_table') + ('?' + q if q else '')
+        bulk_ids = request.POST.getlist('ids')
+        bulk_action = (request.POST.get('bulk_action') or '').strip()
+
+        if bulk_action == 'delete' and bulk_ids:
+            deleted = 0
+            for pk in bulk_ids:
+                try:
+                    rec = ContractRecord.objects.get(pk=pk)
+                    base_name = rec.docx_file or rec.pdf_file
+                    rec.delete()
+                    if base_name:
+                        _delete_tkp_files(base_name)
+                    deleted += 1
+                except (ContractRecord.DoesNotExist, ValueError, TypeError):
+                    pass
+            if deleted:
+                messages.success(request, f'Удалено записей: {deleted}.')
+            return redirect(url)
+
+        if bulk_action == 'copy' and bulk_ids:
+            copied = 0
+            for pk in bulk_ids:
+                try:
+                    rec = ContractRecord.objects.get(pk=pk)
+                    seq = _get_next_contract_seq_for_date(rec.date)
+                    new_number = f'{rec.date:%d%m%Y}_{seq}'
+                    ContractRecord.objects.create(
+                        date=rec.date,
+                        number=new_number,
+                        status=ContractRecord.STATUS_DRAFT,
+                        tkp=rec.tkp,
+                        counterparty=rec.counterparty,
+                        client=rec.client or '',
+                        service=rec.service or '',
+                        sum_total=rec.sum_total or Decimal(0),
+                        docx_file='',
+                        pdf_file='',
+                        contract_snapshot=rec.contract_snapshot,
+                        created_by=request.user,
+                    )
+                    copied += 1
+                except (ContractRecord.DoesNotExist, ValueError, TypeError):
+                    pass
+            if copied:
+                messages.success(request, f'Скопировано записей: {copied}.')
+            return redirect(url)
+
+        delete_id = request.POST.get('delete_id', '').strip()
+        if delete_id:
+            try:
+                rec = ContractRecord.objects.get(pk=delete_id)
+                base_name = rec.docx_file or rec.pdf_file
+                rec.delete()
+                if base_name:
+                    _delete_tkp_files(base_name)
+                messages.success(request, 'Запись договора удалена.')
+            except ContractRecord.DoesNotExist:
+                messages.error(request, 'Запись не найдена.')
+            return redirect(url)
     records = ContractRecord.objects.select_related('tkp', 'counterparty', 'created_by')
     client = request.GET.get('client', '').strip()
     service = request.GET.get('service', '').strip()

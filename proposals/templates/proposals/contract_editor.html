@@ -16,17 +16,17 @@
     border: 1px solid var(--border);
     overflow: auto;
 }
-.contract-editor-wrap .ck.ck-editor { border: none; min-height: 70vh; }
-.contract-editor-wrap .ck.ck-editor__main > .ck-editor__editable { border: none; border-radius: 0; min-height: 70vh; }
-.contract-editor-wrap .ck.ck-toolbar { border: none; border-bottom: 1px solid var(--border); background: #f9fafb; }
-.contract-editor-wrap .ck-content { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 14pt; line-height: 1.5; color: #000; padding: 1rem; }
-.contract-editor-wrap .ck-content p, .contract-editor-wrap .ck-content div { margin: 0 0 0.75em; text-align: justify; }
-.contract-editor-wrap .ck-content strong, .contract-editor-wrap .ck-content b { font-weight: 700; }
-.contract-editor-wrap .ck-content h1, .contract-editor-wrap .ck-content h2 { font-weight: 700; margin: 1em 0 0.5em; font-size: 14pt; }
-.contract-editor-wrap .ck-content h1 { text-align: center; }
-.contract-editor-wrap .ck-content h2 { text-align: left; margin-top: 1.25em; }
-.contract-editor-wrap .ck-content table { width: 100%; border-collapse: collapse; }
-.contract-editor-wrap .ck-content th, .contract-editor-wrap .ck-content td { border: 1px solid #000; padding: 0.25em 0.5em; }
+.contract-editor-wrap .tox-tinymce { border: none; min-height: 70vh; }
+.contract-editor-wrap .tox .tox-edit-area__iframe { min-height: 70vh; }
+.contract-editor-wrap .tox .tox-toolbar { border: none; border-bottom: 1px solid var(--border); background: #f9fafb; }
+.contract-editor-wrap .mce-content-body { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 14pt; line-height: 1.5; color: #000; padding: 1rem; }
+.contract-editor-wrap .mce-content-body p, .contract-editor-wrap .mce-content-body div { margin: 0 0 0.75em; text-align: justify; }
+.contract-editor-wrap .mce-content-body strong, .contract-editor-wrap .mce-content-body b { font-weight: 700; }
+.contract-editor-wrap .mce-content-body h1, .contract-editor-wrap .mce-content-body h2 { font-weight: 700; margin: 1em 0 0.5em; font-size: 14pt; }
+.contract-editor-wrap .mce-content-body h1 { text-align: center; }
+.contract-editor-wrap .mce-content-body h2 { text-align: left; margin-top: 1.25em; }
+.contract-editor-wrap .mce-content-body table { width: 100%; border-collapse: collapse; }
+.contract-editor-wrap .mce-content-body th, .contract-editor-wrap .mce-content-body td { border: 1px solid #000; padding: 0.25em 0.5em; }
 .contract-editor-actions { margin-top: 1.25rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .contract-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.5rem; }
 .contract-steps .step { width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.9rem; background: #e5e7eb; color: #6b7280; text-decoration: none; }
@@ -64,31 +64,57 @@
     </form>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@ckeditor/ckeditor5-build-classic@41.3.1/build/ckeditor.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var textarea = document.getElementById('contract_editor_content');
     if (!textarea) return;
-    if (typeof ClassicEditor === 'undefined') {
-        textarea.placeholder = 'Редактор не загрузился. Проверьте подключение к интернету.';
-        return;
-    }
-    ClassicEditor
-        .create(textarea, {
-            toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|', 'outdent', 'indent', '|', 'blockQuote', 'insertTable', 'undo', 'redo']
-        })
-        .then(function(editor) {
+
+    tinymce.init({
+        selector: '#contract_editor_content',
+        base_url: 'https://cdn.jsdelivr.net/npm/tinymce@6',
+        suffix: '.min',
+        height: 500,
+        promotion: false,
+        // Сохранение верстки исходного шаблона: разрешаем все теги и атрибуты
+        valid_elements: '*[*]',
+        extended_valid_elements: 'style,link[href|rel|type],div[class|id|style|align],span[class|id|style|align],table[class|id|style|width|border|cellpadding|cellspacing],tbody,thead,tfoot,tr,td[class|id|style|colspan|rowspan|width|height],th[class|id|style|colspan|rowspan]',
+        invalid_elements: '',
+        // Отключаем агрессивную очистку
+        verify_html: false,
+        cleanup: false,
+        trim_span_elements: false,
+        // Вставка: сохранять разметку и стили
+        paste_as_text: false,
+        paste_retain_style_properties: 'all',
+        paste_remove_styles_if_webkit: false,
+        paste_merge_formats: true,
+        // Стили в контенте
+        style_formats_autohide: false,
+        allow_script_urls: true,
+        // Кодирование сущностей: не превращать в &amp; и т.д. там, где не нужно
+        entity_encoding: 'named',
+        // Не удалять пустые теги (например пустые ячейки таблиц)
+        remove_trailing_brs: false,
+        // Плагины и панель
+        plugins: 'advlist autolink lists link image charmap anchor code table searchreplace fullscreen',
+        toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link table | code fullscreen',
+        block_formats: 'Paragraph=p; Заголовок 1=h1; Заголовок 2=h2; Заголовок 3=h3',
+        content_style: 'body { font-family: "Times New Roman", Times, Georgia, serif; font-size: 14pt; line-height: 1.5; color: #000; padding: 1rem; }',
+        setup: function(editor) {
             window.contractEditor = editor;
-            var form = document.getElementById('contract-editor-form');
-            if (form) {
-                form.addEventListener('submit', function() {
-                    editor.updateSourceElement();
-                });
+        }
+    });
+
+    var form = document.getElementById('contract-editor-form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            if (typeof tinymce !== 'undefined') {
+                var ed = tinymce.get('contract_editor_content');
+                if (ed) ed.save();
             }
-        })
-        .catch(function(err) {
-            console.error('CKEditor:', err);
         });
+    }
 });
 </script>
 {% endblock %}

@@ -49,9 +49,16 @@
         </tr>
     </table>
 </form>
-<table class="table-tkp-list" style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8125rem;">
+<form id="bulk-form-tkp" method="post" action="{% url 'proposals:table' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">
+{% csrf_token %}
+<div class="bulk-toolbar" style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+    <button type="submit" name="bulk_action" value="delete" class="btn btn-secondary btn-sm" onclick="var n=document.querySelectorAll('#bulk-form-tkp input[name=ids]:checked').length;return n?confirm('Удалить выбранные записи и их файлы?'):false;">Удалить выбранные</button>
+    <button type="submit" name="bulk_action" value="copy" class="btn btn-secondary btn-sm" onclick="var n=document.querySelectorAll('#bulk-form-tkp input[name=ids]:checked').length;if(!n){alert('Выберите строки для копирования.');return false;}return true;">Копировать выбранные</button>
+</div>
+<table class="table-tkp-list" style="width: 100%; border-collapse: collapse; margin-top: 0; font-size: 0.8125rem;">
     <thead>
         <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: center; padding: 0.4rem 0.5rem; width: 2.5rem;"><input type="checkbox" id="tkp-select-all" title="Выбрать все" aria-label="Выбрать все"></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер документа</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
@@ -68,6 +75,7 @@
         {% for r in records %}
         {% with contract_for_row=contract_by_tkp|get_item:r.pk contract_draft_for_row=contract_draft_by_tkp|get_item:r.pk %}
         <tr class="{% if r.status == 'draft' %}tkp-row-draft{% elif contract_for_row %}tkp-row-with-contract{% endif %}" style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.4rem 0.5rem; text-align: center;"><input type="checkbox" name="ids" value="{{ r.pk }}" form="bulk-form-tkp" class="tkp-row-cb"></td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
             <td style="padding: 0.4rem 0.5rem;">
                 {% if r.status == 'draft' %}
@@ -115,11 +123,21 @@
         {% endwith %}
         {% empty %}
         <tr>
-            <td colspan="10" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
+            <td colspan="11" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</form>
+<script>
+(function(){
+    var selectAll = document.getElementById('tkp-select-all');
+    var checkboxes = document.querySelectorAll('.tkp-row-cb');
+    if (selectAll && checkboxes.length) {
+        selectAll.addEventListener('change', function(){ checkboxes.forEach(function(cb){ cb.checked = selectAll.checked; }); });
+    }
+})();
+</script>
 <p style="margin-top: 1.5rem;">
     <a href="{% url 'proposals:form' %}" class="btn">Формирование ТКП</a>
 </p>
