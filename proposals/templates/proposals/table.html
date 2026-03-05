@@ -58,6 +58,7 @@
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
             <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Статус</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Владелец</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Договор</th>
             <th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Удалить</th>
@@ -79,6 +80,7 @@
             <td style="padding: 0.4rem 0.5rem;">{{ r.service }}</td>
             <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.get_status_display|default:"Итоговый" }}</td>
+            <td style="padding: 0.4rem 0.5rem;">{% if r.created_by %}{{ r.created_by.get_full_name|default:r.created_by.username }}{% else %}—{% endif %}</td>
             <td style="padding: 0.4rem 0.5rem;">
                 {% if r.status == 'draft' %}—{% else %}
                 <a href="{% url 'proposals:download_file' 'pdf' %}?f={{ r.number|urlencode }}" class="table-file-link">.pdf</a>
@@ -86,11 +88,17 @@
                 {% endif %}
             </td>
             <td style="padding: 0.4rem 0.5rem;">
-                {% if r.status == 'draft' %}—{% elif contract_for_row %}
+                {% if r.status == 'draft' %}
+                {% if r.pk in contract_template_by_tkp or r.service in contract_template_by_service %}
+                <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract" class="btn btn-sm">Сформировать Договор</a>
+                {% else %}—{% endif %}
+                {% elif contract_for_row %}
                 <a href="#" class="btn btn-sm btn-contract-done" data-contract-card="{% url 'proposals:contract_card' contract_for_row.pk %}">Договор сформирован</a>
                 {% elif contract_draft_for_row %}
                 <a href="{% url 'proposals:contract_form' r.pk %}?contract_draft_id={{ contract_draft_for_row.pk }}" class="btn btn-sm btn-contract-draft">Сохранен черновик договора</a>
                 {% elif r.service in contract_template_by_service %}
+                <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract" class="btn btn-sm">Сформировать Договор</a>
+                {% elif r.pk in contract_template_by_tkp %}
                 <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract" class="btn btn-sm">Сформировать Договор</a>
                 {% else %}
                 —
@@ -107,7 +115,7 @@
         {% endwith %}
         {% empty %}
         <tr>
-            <td colspan="9" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
+            <td colspan="10" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
         </tr>
         {% endfor %}
     </tbody>

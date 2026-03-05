@@ -54,9 +54,55 @@ SERVICE_TO_CONTRACT_TEMPLATE = {
     'ДП': '01_Договор_ДП.docx',
     'ДКП': '02_Договор_ДК.docx',
     'Навигация': '03_Договор_Навигация.docx',
+    'Контент': '04_Договор_Контент_система.docx',
+    'Навигация_стенды': '05_Договор_Контент_Навигация.docx',
     'Фасад': '06_Договор_ДП_Фасад.docx',
     'ДК Фасад': '07_Договор_ДК_Фасад.docx',
+    'Благоустройство': '08_Договор_ДПФ_Благоустройство.docx',
 }
+
+# Плейсхолдер в шаблонах договоров 08 и 05 — сюда вставляется таблица спецификации (как в комплексном ТКП)
+CONTRACT_SPEC_TABLE_PLACEHOLDER = '___CONTRACT_SPEC_TABLE___'
+
+
+def get_contract_template_for_complex_tkp(rows):
+    """
+    Определяет шаблон договора для комплексного ТКП по составу строк.
+    - 08: если есть обе услуги Фасад и Благоустройство.
+    - 05: если есть не менее двух из трёх: Навигация, Контент, Навигация_стенды.
+    Возвращает имя файла шаблона или None.
+    """
+    if not rows:
+        return None
+    service_names = {r.get('service_name', '').strip() for r in rows}
+    has_facade = 'Фасад' in service_names
+    has_blag = 'Благоустройство' in service_names
+    if has_facade and has_blag:
+        return '08_Договор_ДПФ_Благоустройство.docx'
+    nav_content_count = sum(1 for s in ('Навигация', 'Контент', 'Навигация_стенды') if s in service_names)
+    if nav_content_count >= 2:
+        return '05_Договор_Контент_Навигация.docx'
+    return None
+
+
+def _complex_rows_json_to_ctx(rows_json):
+    """Преобразует rows_json (из TKPRecord) в rows_ctx для _build_complex_table_document. Возвращает (rows_ctx, total_sum_formatted)."""
+    if not rows_json:
+        return [], '0'
+    rows_ctx = []
+    total = Decimal(0)
+    for r in rows_json:
+        total += Decimal(str(r.get('total') or 0))
+        rows_ctx.append({
+            'service_name': r.get('service_name', ''),
+            'comment': r.get('comment', ''),
+            'srok': r.get('srok', ''),
+            'unit_display': UNIT_DISPLAY.get(r.get('unit', ''), r.get('unit', '')),
+            'quantity': str(r.get('quantity', '')),
+            'price_per_unit': _format_price(Decimal(str(r.get('price_per_unit') or 0))),
+            'total_formatted': _format_price(Decimal(str(r.get('total') or 0))),
+        })
+    return rows_ctx, _format_price(total)
 
 # Текст условий оплаты по умолчанию для договора
 DEFAULT_PAYMENT_TERMS = """2.2.1. В течение 5 (пяти) рабочих дней на основании выставленного Исполнителем счета Заказчик выплачивает Исполнителю аванс в размере 30% от цены Договора;
@@ -273,8 +319,48 @@ def _build_proposal_data_from_form_cleaned(data):
 @login_required
 @require_http_methods(['GET'])
 def start_view(request):
-    """Стартовая страница: фон main.png и боковое меню."""
-    return render(request, 'proposals/start.html')
+    """Дашборд: сводки по ТКП и договорам, последние действия."""
+    from django.db.models import Sum
+    tkp_draft_count = TKPRecord.objects.filter(status=TKPRecord.STATUS_DRAFT).count()
+    tkp_final_count = TKPRecord.objects.filter(status=TKPRecord.STATUS_FINAL).count()
+    contract_draft_count = ContractRecord.objects.filter(status=ContractRecord.STATUS_DRAFT).count()
+    contract_total_count = ContractRecord.objects.count()
+    sum_tkp = TKPRecord.objects.filter(status=TKPRecord.STATUS_FINAL).aggregate(s=Sum('sum_total'))['s'] or 0
+    sum_contracts = ContractRecord.objects.filter(status=ContractRecord.STATUS_FINAL).aggregate(s=Sum('sum_total'))['s'] or 0
+    recent_tkp = TKPRecord.objects.select_related('created_by').order_by('-created_at')[:10]
+    recent_contracts = ContractRecord.objects.select_related('created_by', 'tkp').order_by('-created_at')[:10]
+    contract_by_tkp = {
+        c.tkp_id: c
+        for c in ContractRecord.objects.filter(
+            status=ContractRecord.STATUS_FINAL, tkp__isnull=False
+        ).select_related('tkp')
+    }
+    contract_draft_by_tkp = {
+        c.tkp_id: c
+        for c in ContractRecord.objects.filter(
+            status=ContractRecord.STATUS_DRAFT, tkp__isnull=False
+        ).select_related('tkp')
+    }
+    contract_template_by_tkp = {}
+    for r in recent_tkp:
+        if r.service == 'Комплексное ТКП' and r.rows_json:
+            tpl = get_contract_template_for_complex_tkp(r.rows_json)
+            contract_template_by_tkp[r.pk] = tpl if tpl else True
+    context = {
+        'tkp_draft_count': tkp_draft_count,
+        'tkp_final_count': tkp_final_count,
+        'contract_draft_count': contract_draft_count,
+        'contract_total_count': contract_total_count,
+        'sum_tkp': sum_tkp,
+        'sum_contracts': sum_contracts,
+        'recent_tkp': recent_tkp,
+        'recent_contracts': recent_contracts,
+        'contract_template_by_service': SERVICE_TO_CONTRACT_TEMPLATE,
+        'contract_template_by_tkp': contract_template_by_tkp,
+        'contract_by_tkp': contract_by_tkp,
+        'contract_draft_by_tkp': contract_draft_by_tkp,
+    }
+    return render(request, 'proposals/start.html', context)
 
 
 @login_required
@@ -373,7 +459,7 @@ def form_view(request):
                     'text': (form.data.get('text') or '').strip(),
                     's': str(s_draft) if s_draft is not None and s_draft != '' else '',
                 }
-                _save_tkp_record(proposal_data, status=TKPRecord.STATUS_DRAFT)
+                _save_tkp_record(proposal_data, status=TKPRecord.STATUS_DRAFT, user=request.user)
                 messages.success(request, 'Черновик ТКП сохранён в перечень.')
                 return redirect('proposals:table')
             if draft_errors:
@@ -431,7 +517,7 @@ def confirm_view(request):
 
     if request.method == 'POST':
         if request.POST.get('save_draft'):
-            _save_tkp_record(data, status=TKPRecord.STATUS_DRAFT)
+            _save_tkp_record(data, status=TKPRecord.STATUS_DRAFT, user=request.user)
             messages.success(request, 'Черновик ТКП сохранён в перечень.')
             return redirect('proposals:table')
         try:
@@ -440,7 +526,7 @@ def confirm_view(request):
             messages.error(request, f'Ошибка генерации: {e}')
             return redirect('proposals:confirm')
         if base_name:
-            _save_tkp_record(data)
+            _save_tkp_record(data, user=request.user)
             draft_id = request.session.pop('tkp_draft_id', None)
             if draft_id:
                 TKPRecord.objects.filter(pk=draft_id).delete()
@@ -614,7 +700,7 @@ def complex_form_view(request):
                     'text1': text1_val,
                 }
                 request.session['complex_proposal_data'] = data
-                _save_complex_tkp_record(data, status=TKPRecord.STATUS_DRAFT)
+                _save_complex_tkp_record(data, status=TKPRecord.STATUS_DRAFT, user=request.user)
                 messages.success(request, 'Черновик комплексного ТКП сохранён в перечень.')
                 return redirect('proposals:table')
             for err in draft_errors:
@@ -714,7 +800,7 @@ def complex_confirm_view(request):
 
     if request.method == 'POST':
         if request.POST.get('save_draft'):
-            _save_complex_tkp_record(data, status=TKPRecord.STATUS_DRAFT)
+            _save_complex_tkp_record(data, status=TKPRecord.STATUS_DRAFT, user=request.user)
             messages.success(request, 'Черновик комплексного ТКП сохранён в перечень.')
             return redirect('proposals:table')
         try:
@@ -723,7 +809,7 @@ def complex_confirm_view(request):
             messages.error(request, f'Ошибка генерации: {e}')
             return redirect('proposals:complex_confirm')
         if base_name:
-            _save_complex_tkp_record(data)
+            _save_complex_tkp_record(data, user=request.user)
             draft_id = request.session.pop('complex_draft_id', None)
             if draft_id:
                 TKPRecord.objects.filter(pk=draft_id).delete()
@@ -886,12 +972,13 @@ def _build_complex_table_document(rows_ctx, total_sum_formatted):
     return doc
 
 
-def _insert_table_into_docx(docx_path, table_doc):
+def _insert_table_into_docx(docx_path, table_doc, placeholder=None):
     """Находит в docx абзац с плейсхолдером и заменяет его на таблицу."""
     from copy import deepcopy
     from docx import Document
+    if placeholder is None:
+        placeholder = TKP_TABLE_PLACEHOLDER
     doc = Document(str(docx_path))
-    placeholder = TKP_TABLE_PLACEHOLDER
     for p in doc.paragraphs:
         if placeholder in p.text:
             table = table_doc.tables[0]
@@ -966,16 +1053,36 @@ def _generate_complex_and_save_files(data):
         return base_name
 
 
-def _save_complex_tkp_record(data, status=None):
+def _serialize_complex_rows_for_storage(rows):
+    """Сериализация строк комплексного ТКП для сохранения в rows_json."""
+    if not rows:
+        return None
+    return [
+        {
+            'service_name': r.get('service_name', ''),
+            'comment': r.get('comment', ''),
+            'srok': r.get('srok', ''),
+            'unit': r.get('unit', ''),
+            'quantity': str(r.get('quantity', '')),
+            'price_per_unit': str(r.get('price_per_unit', '')),
+            'total': str(r.get('total', '')),
+        }
+        for r in rows
+    ]
+
+
+def _save_complex_tkp_record(data, status=None, user=None):
     """Сохранение записи о сформированном комплексном ТКП (status по умолчанию — итоговый)."""
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
-    total_sum = sum(Decimal(str(r['total'])) for r in data.get('rows', []))
+    rows = data.get('rows', [])
+    total_sum = sum(Decimal(str(r['total'])) for r in rows)
     if status == TKPRecord.STATUS_DRAFT:
         seq = _get_next_draft_seq_for_date(date_obj)
         number = _generate_draft_number(date_obj, seq)
     else:
         seq = _get_next_seq_for_date(date_obj)
         number = _generate_doc_number(data.get('client') or '', date_obj, seq)
+    rows_json = _serialize_complex_rows_for_storage(rows)
     TKPRecord.objects.create(
         date=date_obj,
         number=number,
@@ -986,6 +1093,8 @@ def _save_complex_tkp_record(data, status=None):
         s='',
         text=data.get('text1') or '',
         status=status or TKPRecord.STATUS_FINAL,
+        created_by=user,
+        rows_json=rows_json,
     )
 
 
@@ -1019,7 +1128,7 @@ def table_view(request):
         q = request.GET.urlencode()
         url = reverse('proposals:table') + ('?' + q if q else '')
         return redirect(url)
-    records = TKPRecord.objects.all()
+    records = TKPRecord.objects.select_related('created_by').all()
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()
     number = request.GET.get('number', '').strip()
@@ -1069,6 +1178,13 @@ def table_view(request):
             status=ContractRecord.STATUS_DRAFT, tkp__isnull=False
         ).select_related('tkp')
     }
+    contract_template_by_tkp = {}
+    for r in records:
+        if r.service == 'Комплексное ТКП' and r.rows_json:
+            tpl = get_contract_template_for_complex_tkp(r.rows_json)
+            # Показываем кнопку для любого комплексного ТКП с сохранёнными строками;
+            # при отсутствии шаблона contract_form_view покажет сообщение
+            contract_template_by_tkp[r.pk] = tpl if tpl else True
     context = {
         'records': records,
         'filters': {
@@ -1082,6 +1198,7 @@ def table_view(request):
         },
         'services_list': services,
         'contract_template_by_service': contract_template_by_service,
+        'contract_template_by_tkp': contract_template_by_tkp,
         'contract_by_tkp': contract_by_tkp,
         'contract_draft_by_tkp': contract_draft_by_tkp,
     }
@@ -1098,16 +1215,21 @@ def contract_form_view(request, tkp_id):
         messages.error(request, 'Запись ТКП не найдена.')
         return redirect('proposals:table')
 
-    contract_template_file = SERVICE_TO_CONTRACT_TEMPLATE.get(tkp.service)
-    if not contract_template_file:
-        messages.error(request, f'Для услуги «{tkp.service}» формирование договора не предусмотрено.')
-        return redirect('proposals:table')
+    COMPLEX_CONTRACT_TEMPLATE_05 = '05_Договор_Контент_Навигация.docx'
+    COMPLEX_CONTRACT_TEMPLATE_08 = '08_Договор_ДПФ_Благоустройство.docx'
+
+    if tkp.service == 'Комплексное ТКП':
+        is_complex_contract = True
+        # Шаблон выбирается пользователем в форме (поле «Комплексный договор»), по умолчанию — 05
+        contract_template_file = None  # задаётся ниже из initial или из form
+    else:
+        contract_template_file = SERVICE_TO_CONTRACT_TEMPLATE.get(tkp.service)
+        if not contract_template_file:
+            messages.error(request, f'Для услуги «{tkp.service}» формирование договора не предусмотрено.')
+            return redirect('proposals:table')
+        is_complex_contract = False
 
     templates_dir = getattr(settings, 'TEMPLATES_DOCX_DIR', Path(settings.BASE_DIR) / 'templates_docx')
-    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
-    if not template_path.exists():
-        messages.error(request, f'Шаблон договора не найден: {contract_template_file}')
-        return redirect('proposals:table')
 
     # Предзаполнение: из черновика (GET contract_draft_id) или из ТКП и карточки контрагента
     contract_draft_id = None
@@ -1136,6 +1258,8 @@ def contract_form_view(request, tkp_id):
         'room': tkp.room or '',
         's': tkp.s or '',
     }
+    if is_complex_contract:
+        initial['complex_contract_type'] = COMPLEX_CONTRACT_TEMPLATE_05
     if draft_record:
         initial['contract_number'] = draft_record.number
         initial['date'] = draft_record.date.strftime('%Y-%m-%d')
@@ -1171,8 +1295,24 @@ def contract_form_view(request, tkp_id):
     else:
         initial['customer_name'] = tkp.client or ''
 
+    # Для комплексного ТКП шаблон берём из выбора пользователя (по умолчанию 05)
+    if is_complex_contract:
+        contract_template_file = initial.get('complex_contract_type') or COMPLEX_CONTRACT_TEMPLATE_05
+    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
+    if not template_path.exists():
+        messages.error(request, f'Шаблон договора не найден: {contract_template_file}')
+        return redirect('proposals:table')
+
     if request.method == 'POST':
         form = ContractForm(request.POST)
+        # Для комплексного ТКП шаблон берём из выбора в форме
+        if is_complex_contract:
+            ct = (request.POST.get('complex_contract_type') or '').strip()
+            if ct in (COMPLEX_CONTRACT_TEMPLATE_05, COMPLEX_CONTRACT_TEMPLATE_08):
+                contract_template_file = ct
+            else:
+                contract_template_file = COMPLEX_CONTRACT_TEMPLATE_05
+            template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
         save_draft = request.POST.get('save_draft')
         if save_draft:
             draft_errors = []
@@ -1246,6 +1386,7 @@ def contract_form_view(request, tkp_id):
                         client=tkp.client or '',
                         service=tkp.service or '',
                         sum_total=tkp.sum_total or Decimal(0),
+                        created_by=request.user,
                     )
                     messages.success(request, 'Черновик договора сохранён.')
                 return redirect('proposals:table')
@@ -1253,156 +1394,186 @@ def contract_form_view(request, tkp_id):
                 messages.error(request, err)
             contract_draft_id = request.POST.get('contract_draft_id')
         elif request.POST.get('preview_edit') and form.is_valid():
-            cd = form.cleaned_data
-            cp = cd['counterparty']
-            date_obj = cd['date']
-            price_val = cd['price']
-            seq = _get_next_contract_seq_for_date(date_obj)
-            contract_number = f'{date_obj:%d%m%Y}_{seq}'
-            customer_name = (cd.get('customer_name') or '').strip() or (cp.name or '')
-            customer_represented_by = (cd.get('customer_represented_by') or '').strip()
-            if not customer_represented_by:
-                customer_represented_by = _director_genitive(cp.director or '')
-            customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
-            payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
-            customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
-            ctx = {
-                'contract_number': contract_number,
-                'number': contract_number,
-                'date': date_obj.strftime('%d.%m.%Y'),
-                'customer_name': customer_name,
-                'customer_represented_by': customer_represented_by,
-                'customer_represented_by_nominative': customer_represented_by_nominative,
-                'customer_in_person': customer_in_person_raw,
-                'dolznost': _dolznost_from_customer_in_person(customer_in_person_raw),
-                'acting_on_basis': (cd.get('acting_on_basis') or '').strip(),
-                'work_completion_period': (cd.get('work_completion_period') or '').strip(),
-                'period_starts_from': (cd.get('period_starts_from') or '').strip(),
-                'price': _format_price(price_val),
-                'payment_terms': payment_terms,
-                'name': cd.get('name') or cp.name or '',
-                'address': cd.get('address') or cp.address or '',
-                'inn': cd.get('inn') or cp.inn or '',
-                'kpp': cd.get('kpp') or cp.kpp or '',
-                'ogrn': cd.get('ogrn') or cp.ogrn or '',
-                'account': cd.get('account') or cp.account or '',
-                'bank': cd.get('bank') or cp.bank or '',
-                'bik': cd.get('bik') or cp.bik or '',
-                'kor_account': cd.get('kor_account') or cp.kor_account or '',
-                'email': cd.get('email') or cp.email or '',
-                'room': cd.get('room') or tkp.room or '',
-                's': cd.get('s') or tkp.s or '',
-            }
-            doc = DocxTemplate(str(template_path))
-            doc.render(ctx)
-            _set_contract_doc_font_times_new_roman(doc)
-            buf = io.BytesIO()
-            doc.save(buf)
-            buf.seek(0)
-            try:
-                result = mammoth.convert_to_html(buf)
-                html_content = result.value or '<p>Не удалось преобразовать документ в HTML.</p>'
-            except Exception:
-                html_content = '<p>Ошибка преобразования черновика в HTML. Проверьте шаблон договора.</p>'
-            request.session['contract_editor_html'] = html_content
-            request.session['contract_editor_tkp_id'] = tkp_id
-            request.session['contract_editor_contract_number'] = contract_number
-            request.session['contract_editor_date'] = date_obj.strftime('%Y-%m-%d')
-            request.session['contract_editor_price'] = str(price_val)
-            request.session['contract_editor_counterparty_id'] = cp.pk
-            request.session['contract_editor_draft_id'] = request.POST.get('contract_draft_id') or ''
-            request.session['contract_editor_template_file'] = contract_template_file
-            return redirect('proposals:contract_editor')
+            if is_complex_contract and not form.cleaned_data.get('complex_contract_type'):
+                form.add_error('complex_contract_type', 'Выберите тип комплексного договора.')
+            if not form.errors:
+                cd = form.cleaned_data
+                if is_complex_contract:
+                    contract_template_file = cd['complex_contract_type']
+                    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
+                cp = cd['counterparty']
+                date_obj = cd['date']
+                price_val = cd['price']
+                seq = _get_next_contract_seq_for_date(date_obj)
+                contract_number = f'{date_obj:%d%m%Y}_{seq}'
+                customer_name = (cd.get('customer_name') or '').strip() or (cp.name or '')
+                customer_represented_by = (cd.get('customer_represented_by') or '').strip()
+                if not customer_represented_by:
+                    customer_represented_by = _director_genitive(cp.director or '')
+                customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
+                payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+                customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
+                ctx = {
+                    'contract_number': contract_number,
+                    'number': contract_number,
+                    'date': date_obj.strftime('%d.%m.%Y'),
+                    'customer_name': customer_name,
+                    'customer_represented_by': customer_represented_by,
+                    'customer_represented_by_nominative': customer_represented_by_nominative,
+                    'customer_in_person': customer_in_person_raw,
+                    'dolznost': _dolznost_from_customer_in_person(customer_in_person_raw),
+                    'acting_on_basis': (cd.get('acting_on_basis') or '').strip(),
+                    'work_completion_period': (cd.get('work_completion_period') or '').strip(),
+                    'period_starts_from': (cd.get('period_starts_from') or '').strip(),
+                    'price': _format_price(price_val),
+                    'payment_terms': payment_terms,
+                    'name': cd.get('name') or cp.name or '',
+                    'address': cd.get('address') or cp.address or '',
+                    'inn': cd.get('inn') or cp.inn or '',
+                    'kpp': cd.get('kpp') or cp.kpp or '',
+                    'ogrn': cd.get('ogrn') or cp.ogrn or '',
+                    'account': cd.get('account') or cp.account or '',
+                    'bank': cd.get('bank') or cp.bank or '',
+                    'bik': cd.get('bik') or cp.bik or '',
+                    'kor_account': cd.get('kor_account') or cp.kor_account or '',
+                    'email': cd.get('email') or cp.email or '',
+                    'room': cd.get('room') or tkp.room or '',
+                    's': cd.get('s') or tkp.s or '',
+                }
+                doc = DocxTemplate(str(template_path))
+                doc.render(ctx)
+                _set_contract_doc_font_times_new_roman(doc)
+                if is_complex_contract and tkp.rows_json:
+                    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp:
+                        doc.save(tmp.name)
+                        rows_ctx, total_fmt = _complex_rows_json_to_ctx(tkp.rows_json)
+                        table_doc = _build_complex_table_document(rows_ctx, total_fmt)
+                        _insert_table_into_docx(tmp.name, table_doc, CONTRACT_SPEC_TABLE_PLACEHOLDER)
+                        with open(tmp.name, 'rb') as f:
+                            buf = io.BytesIO(f.read())
+                        try:
+                            os.unlink(tmp.name)
+                        except OSError:
+                            pass
+                else:
+                    buf = io.BytesIO()
+                    doc.save(buf)
+                buf.seek(0)
+                try:
+                    result = mammoth.convert_to_html(buf)
+                    html_content = result.value or '<p>Не удалось преобразовать документ в HTML.</p>'
+                except Exception:
+                    html_content = '<p>Ошибка преобразования черновика в HTML. Проверьте шаблон договора.</p>'
+                request.session['contract_editor_html'] = html_content
+                request.session['contract_editor_tkp_id'] = tkp_id
+                request.session['contract_editor_contract_number'] = contract_number
+                request.session['contract_editor_date'] = date_obj.strftime('%Y-%m-%d')
+                request.session['contract_editor_price'] = str(price_val)
+                request.session['contract_editor_counterparty_id'] = cp.pk
+                request.session['contract_editor_draft_id'] = request.POST.get('contract_draft_id') or ''
+                request.session['contract_editor_template_file'] = contract_template_file
+                return redirect('proposals:contract_editor')
         elif form.is_valid():
-            cd = form.cleaned_data
-            cp = cd['counterparty']
-            date_obj = cd['date']
-            price_val = cd['price']
-            seq = _get_next_contract_seq_for_date(date_obj)
-            contract_number = f'{date_obj:%d%m%Y}_{seq}'
-            customer_name = (cd.get('customer_name') or '').strip() or (cp.name or '')
-            customer_represented_by = (cd.get('customer_represented_by') or '').strip()
-            if not customer_represented_by:
-                customer_represented_by = _director_genitive(cp.director or '')
-            customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
-            payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
-            customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
-            ctx = {
-                'contract_number': contract_number,
-                'number': contract_number,
-                'date': date_obj.strftime('%d.%m.%Y'),
-                'customer_name': customer_name,
-                'customer_represented_by': customer_represented_by,
-                'customer_represented_by_nominative': customer_represented_by_nominative,
-                'customer_in_person': customer_in_person_raw,
-                'dolznost': _dolznost_from_customer_in_person(customer_in_person_raw),
-                'acting_on_basis': (cd.get('acting_on_basis') or '').strip(),
-                'work_completion_period': (cd.get('work_completion_period') or '').strip(),
-                'period_starts_from': (cd.get('period_starts_from') or '').strip(),
-                'price': _format_price(price_val),
-                'payment_terms': payment_terms,
-                'name': cd.get('name') or cp.name or '',
-                'address': cd.get('address') or cp.address or '',
-                'inn': cd.get('inn') or cp.inn or '',
-                'kpp': cd.get('kpp') or cp.kpp or '',
-                'ogrn': cd.get('ogrn') or cp.ogrn or '',
-                'account': cd.get('account') or cp.account or '',
-                'bank': cd.get('bank') or cp.bank or '',
-                'bik': cd.get('bik') or cp.bik or '',
-                'kor_account': cd.get('kor_account') or cp.kor_account or '',
-                'email': cd.get('email') or cp.email or '',
-                'room': cd.get('room') or tkp.room or '',
-                's': cd.get('s') or tkp.s or '',
-            }
-            doc = DocxTemplate(str(template_path))
-            doc.render(ctx)
-            _set_contract_doc_font_times_new_roman(doc)
-            out_format = (request.POST.get('format') or 'docx').strip().lower()
-            if out_format != 'pdf':
-                out_format = 'docx'
-            file_base = f'Дог_{contract_number}'
-            out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
-            out_dir.mkdir(parents=True, exist_ok=True)
-            docx_path = out_dir / f'{file_base}.docx'
-            pdf_path = out_dir / f'{file_base}.pdf'
-            doc.save(str(docx_path))
-            with tempfile.TemporaryDirectory() as tmpdir:
-                tmpdir = Path(tmpdir)
-                doc.save(str(tmpdir / 'contract.docx'))
-                _convert_docx_to_pdf(tmpdir / 'contract.docx', tmpdir)
-                src = tmpdir / 'contract.pdf'
-                if not src.exists():
-                    src = tmpdir / 'tkp.pdf'
-                if not src.exists():
-                    src = next(tmpdir.glob('*.pdf'), None)
-                if src and src.exists():
-                    shutil.copy2(src, pdf_path)
-            ContractRecord.objects.create(
-                date=date_obj,
-                number=contract_number,
-                status=ContractRecord.STATUS_FINAL,
-                tkp=tkp,
-                counterparty=cp,
-                client=tkp.client or '',
-                service=tkp.service or '',
-                sum_total=price_val,
-                docx_file=file_base,
-                pdf_file=file_base,
-                contract_snapshot=ctx,
-            )
-            if out_format == 'docx':
-                return FileResponse(
-                    open(docx_path, 'rb'),
-                    as_attachment=True,
-                    filename=f'{file_base}.docx',
+            if is_complex_contract and not form.cleaned_data.get('complex_contract_type'):
+                form.add_error('complex_contract_type', 'Выберите тип комплексного договора.')
+            if not form.errors:
+                cd = form.cleaned_data
+                if is_complex_contract:
+                    contract_template_file = cd['complex_contract_type']
+                    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
+                cp = cd['counterparty']
+                date_obj = cd['date']
+                price_val = cd['price']
+                seq = _get_next_contract_seq_for_date(date_obj)
+                contract_number = f'{date_obj:%d%m%Y}_{seq}'
+                customer_name = (cd.get('customer_name') or '').strip() or (cp.name or '')
+                customer_represented_by = (cd.get('customer_represented_by') or '').strip()
+                if not customer_represented_by:
+                    customer_represented_by = _director_genitive(cp.director or '')
+                customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
+                payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+                customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
+                ctx = {
+                    'contract_number': contract_number,
+                    'number': contract_number,
+                    'date': date_obj.strftime('%d.%m.%Y'),
+                    'customer_name': customer_name,
+                    'customer_represented_by': customer_represented_by,
+                    'customer_represented_by_nominative': customer_represented_by_nominative,
+                    'customer_in_person': customer_in_person_raw,
+                    'dolznost': _dolznost_from_customer_in_person(customer_in_person_raw),
+                    'acting_on_basis': (cd.get('acting_on_basis') or '').strip(),
+                    'work_completion_period': (cd.get('work_completion_period') or '').strip(),
+                    'period_starts_from': (cd.get('period_starts_from') or '').strip(),
+                    'price': _format_price(price_val),
+                    'payment_terms': payment_terms,
+                    'name': cd.get('name') or cp.name or '',
+                    'address': cd.get('address') or cp.address or '',
+                    'inn': cd.get('inn') or cp.inn or '',
+                    'kpp': cd.get('kpp') or cp.kpp or '',
+                    'ogrn': cd.get('ogrn') or cp.ogrn or '',
+                    'account': cd.get('account') or cp.account or '',
+                    'bank': cd.get('bank') or cp.bank or '',
+                    'bik': cd.get('bik') or cp.bik or '',
+                    'kor_account': cd.get('kor_account') or cp.kor_account or '',
+                    'email': cd.get('email') or cp.email or '',
+                    'room': cd.get('room') or tkp.room or '',
+                    's': cd.get('s') or tkp.s or '',
+                }
+                doc = DocxTemplate(str(template_path))
+                doc.render(ctx)
+                _set_contract_doc_font_times_new_roman(doc)
+                out_format = (request.POST.get('format') or 'docx').strip().lower()
+                if out_format != 'pdf':
+                    out_format = 'docx'
+                file_base = f'Дог_{contract_number}'
+                out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
+                out_dir.mkdir(parents=True, exist_ok=True)
+                docx_path = out_dir / f'{file_base}.docx'
+                pdf_path = out_dir / f'{file_base}.pdf'
+                doc.save(str(docx_path))
+                if is_complex_contract and tkp.rows_json:
+                    rows_ctx, total_fmt = _complex_rows_json_to_ctx(tkp.rows_json)
+                    table_doc = _build_complex_table_document(rows_ctx, total_fmt)
+                    _insert_table_into_docx(str(docx_path), table_doc, CONTRACT_SPEC_TABLE_PLACEHOLDER)
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    tmpdir = Path(tmpdir)
+                    shutil.copy2(docx_path, tmpdir / 'contract.docx')
+                    _convert_docx_to_pdf(tmpdir / 'contract.docx', tmpdir)
+                    src = tmpdir / 'contract.pdf'
+                    if not src.exists():
+                        src = tmpdir / 'tkp.pdf'
+                    if not src.exists():
+                        src = next(tmpdir.glob('*.pdf'), None)
+                    if src and src.exists():
+                        shutil.copy2(src, pdf_path)
+                ContractRecord.objects.create(
+                    date=date_obj,
+                    number=contract_number,
+                    status=ContractRecord.STATUS_FINAL,
+                    tkp=tkp,
+                    counterparty=cp,
+                    client=tkp.client or '',
+                    service=tkp.service or '',
+                    sum_total=price_val,
+                    docx_file=file_base,
+                    pdf_file=file_base,
+                    contract_snapshot=ctx,
+                    created_by=request.user,
                 )
-            if pdf_path.exists():
-                return FileResponse(
-                    open(pdf_path, 'rb'),
-                    as_attachment=True,
-                    filename=f'{file_base}.pdf',
-                )
-            messages.error(request, 'Не удалось сформировать PDF. Установите LibreOffice или docx2pdf.')
+                if out_format == 'docx':
+                    return FileResponse(
+                        open(docx_path, 'rb'),
+                        as_attachment=True,
+                        filename=f'{file_base}.docx',
+                    )
+                if pdf_path.exists():
+                    return FileResponse(
+                        open(pdf_path, 'rb'),
+                        as_attachment=True,
+                        filename=f'{file_base}.pdf',
+                    )
+                messages.error(request, 'Не удалось сформировать PDF. Установите LibreOffice или docx2pdf.')
         # form errors: show form again
     else:
         form = ContractForm(initial=initial)
@@ -1423,6 +1594,7 @@ def contract_form_view(request, tkp_id):
         'contract_template_file': contract_template_file,
         'contract_draft_id': contract_draft_id,
         'counterparty_display_name': counterparty_display_name,
+        'is_complex_contract': is_complex_contract,
     })
 
 
@@ -1537,6 +1709,10 @@ def contract_save_from_editor_view(request):
     except Exception as e:
         messages.error(request, f'Не удалось сформировать DOCX из текста: {e}. Установите Pandoc (https://pandoc.org).')
         return redirect('proposals:contract_editor')
+    if template_filename in ('05_Договор_Контент_Навигация.docx', '08_Договор_ДПФ_Благоустройство.docx') and tkp.rows_json:
+        rows_ctx, total_fmt = _complex_rows_json_to_ctx(tkp.rows_json)
+        table_doc = _build_complex_table_document(rows_ctx, total_fmt)
+        _insert_table_into_docx(str(docx_path), table_doc, CONTRACT_SPEC_TABLE_PLACEHOLDER)
     ContractRecord.objects.create(
         date=date_obj,
         number=contract_number,
@@ -1549,6 +1725,7 @@ def contract_save_from_editor_view(request):
         docx_file=file_base,
         pdf_file=file_base,
         contract_snapshot={},
+        created_by=request.user,
     )
     for key in (SESSION_KEY_EDITOR_HTML, SESSION_KEY_EDITOR_TKP_ID, SESSION_KEY_EDITOR_CONTRACT_NUMBER,
                 SESSION_KEY_EDITOR_DATE, SESSION_KEY_EDITOR_PRICE, SESSION_KEY_EDITOR_COUNTERPARTY_ID,
@@ -1875,7 +2052,7 @@ def kanban_save_notes_view(request, tkp_id):
 @require_http_methods(['GET'])
 def contract_table_view(request):
     """Реестр договоров: фильтры (клиент, услуга, статус), сортировка по всем колонкам, колонка Статус договора."""
-    records = ContractRecord.objects.select_related('tkp', 'counterparty')
+    records = ContractRecord.objects.select_related('tkp', 'counterparty', 'created_by')
     client = request.GET.get('client', '').strip()
     service = request.GET.get('service', '').strip()
     status_filter = request.GET.get('status', '').strip().lower()
@@ -2220,7 +2397,7 @@ def _generate_draft_number(date_obj, seq):
     return f'Черновик_{date_obj:%d%m%Y}_{seq}'
 
 
-def _save_tkp_record(data, status=None):
+def _save_tkp_record(data, status=None, user=None):
     """Сохранение записи о сформированном ТКП (status по умолчанию — итоговый)."""
     from datetime import datetime
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
@@ -2240,6 +2417,7 @@ def _save_tkp_record(data, status=None):
         s=str(data.get('s') or ''),
         text=data.get('text') or '',
         status=status or TKPRecord.STATUS_FINAL,
+        created_by=user,
     )
 
 

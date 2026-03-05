@@ -23,10 +23,17 @@
 
 <div class="contract-form-wrap">
 <h1>Реквизиты договора</h1>
-<p>ТКП: <strong>{{ tkp.number }}</strong> — {{ tkp.client|default:"—" }} ({{ tkp.service }}). Шаблон: {{ contract_template_file }}</p>
+<p>ТКП: <strong>{{ tkp.number }}</strong> — {{ tkp.client|default:"—" }} ({{ tkp.service }}).{% if not is_complex_contract %} Шаблон: {{ contract_template_file }}{% endif %}</p>
 
 <form method="post" action="">
     {% csrf_token %}
+    {% if is_complex_contract %}
+    <div style="margin-bottom: 1rem;">
+        {{ form.complex_contract_type.label_tag }}
+        {{ form.complex_contract_type }}
+        {% if form.complex_contract_type.errors %}<ul class="errorlist">{{ form.complex_contract_type.errors }}</ul>{% endif %}
+    </div>
+    {% endif %}
     {% if contract_draft_id %}<input type="hidden" name="contract_draft_id" value="{{ contract_draft_id }}">{% endif %}
     {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
 

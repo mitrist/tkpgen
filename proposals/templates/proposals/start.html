@@ -1,15 +1,162 @@
 {% extends "proposals/base.html" %}
-{% load static %}
-{% block title %}Старт{% endblock %}
-{% block main_extra_class %}main--start{% endblock %}
+{% load proposal_filters %}
+{% block title %}Дашборд{% endblock %}
+{% block main_extra_class %}{% endblock %}
 {% block main_content %}
-{# Абсолютный URL статики помогает при деплое за прокси (Nginx), когда относительный путь к картинке может теряться #}
-<div class="start-page-bg" role="presentation" style="
-    min-height: calc(100vh - 0px);
-    background-color: #100E1C;
-    background-image: url('{{ request.scheme }}://{{ request.get_host }}{% static 'main.png' %}');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-"></div>
+<div class="container container--wide" style="padding: 2rem;">
+    {% if messages %}
+    <ul class="errorlist" style="margin-bottom: 1rem;">
+        {% for msg in messages %}<li>{{ msg }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    <header style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+        <div>
+            <h1 style="margin: 0 0 0.35rem;">Дашборд</h1>
+            <h3 style="margin: 0; font-weight: 600; color: var(--text-muted); font-size: 1.1rem;">Управление ТКП и договорами</h3>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="{% url 'proposals:form' %}" class="btn" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span aria-hidden="true">+</span> Новое ТКП
+            </a>
+            <a href="{% url 'proposals:table' %}" class="btn" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span aria-hidden="true">+</span> Создать новый договор
+            </a>
+        </div>
+    </header>
+
+    <div class="dashboard-cards" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div class="card" style="padding: 1rem;">
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Черновик ТКП</div>
+            <div style="font-size: 1.5rem; font-weight: 700;">{{ tkp_draft_count }}</div>
+        </div>
+        <div class="card" style="padding: 1rem;">
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Сформировано ТКП</div>
+            <div style="font-size: 1.5rem; font-weight: 700;">{{ tkp_final_count }}</div>
+        </div>
+        <div class="card" style="padding: 1rem;">
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Черновик договора</div>
+            <div style="font-size: 1.5rem; font-weight: 700;">{{ contract_draft_count }}</div>
+        </div>
+        <div class="card" style="padding: 1rem;">
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Договоров всего</div>
+            <div style="font-size: 1.5rem; font-weight: 700;">{{ contract_total_count }}</div>
+        </div>
+        <div class="card" style="padding: 1rem;">
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Сумма ТКП</div>
+            <div style="font-size: 1.25rem; font-weight: 700;">{{ sum_tkp|format_price }} ₽</div>
+        </div>
+        <div class="card" style="padding: 1rem;">
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Сумма договоров</div>
+            <div style="font-size: 1.25rem; font-weight: 700;">{{ sum_contracts|format_price }} ₽</div>
+        </div>
+    </div>
+
+    <section class="dashboard-recent" style="background: #e8f4fc; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.1rem; margin: 0 0 1rem;">Последние действия</h2>
+        <div style="display: grid; gap: 1.5rem;">
+            <div>
+                <h3 style="font-size: 1rem; margin: 0 0 0.5rem;">Реестр ТКП</h3>
+                <div style="overflow-x: auto;">
+                    <table class="table-tkp-list" style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border);">
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
+                                <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Статус</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Владелец</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Договор</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in recent_tkp %}
+                            {% with contract_for_row=contract_by_tkp|get_item:r.pk contract_draft_for_row=contract_draft_by_tkp|get_item:r.pk %}
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
+                                <td style="padding: 0.4rem 0.5rem;">
+                                    {% if r.status == 'draft' %}
+                                    <a href="{% if r.service == 'Комплексное ТКП' %}{% url 'proposals:complex_form' %}?draft_id={{ r.pk }}{% else %}{% url 'proposals:form' %}?draft_id={{ r.pk }}{% endif %}">{{ r.number }}</a>
+                                    {% else %}
+                                    <a href="{% url 'proposals:table' %}">{{ r.number }}</a>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
+                                <td style="padding: 0.4rem 0.5rem;">{{ r.service }}</td>
+                                <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+                                <td style="padding: 0.4rem 0.5rem;">{{ r.get_status_display|default:"Итоговый" }}</td>
+                                <td style="padding: 0.4rem 0.5rem;">{% if r.created_by %}{{ r.created_by.get_full_name|default:r.created_by.username }}{% else %}—{% endif %}</td>
+                                <td style="padding: 0.4rem 0.5rem;">
+                                    {% if r.status == 'draft' %}
+                                    {% if r.pk in contract_template_by_tkp or r.service in contract_template_by_service %}
+                                    <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract">Сформировать</a>
+                                    {% else %}—{% endif %}
+                                    {% elif contract_for_row %}
+                                    <a href="{% url 'proposals:contract_table' %}">Договор</a>
+                                    {% elif contract_draft_for_row %}
+                                    <a href="{% url 'proposals:contract_form' r.pk %}?contract_draft_id={{ contract_draft_for_row.pk }}">Черновик</a>
+                                    {% elif r.service in contract_template_by_service %}
+                                    <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract">Сформировать</a>
+                                    {% elif r.pk in contract_template_by_tkp %}
+                                    <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract">Сформировать</a>
+                                    {% else %}—{% endif %}
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" style="padding: 0.75rem; color: var(--text-muted);">Нет записей ТКП</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p style="margin: 0.5rem 0 0;"><a href="{% url 'proposals:table' %}" class="btn btn-secondary btn-sm">Весь реестр ТКП</a></p>
+            </div>
+            <div>
+                <h3 style="font-size: 1rem; margin: 0 0 0.5rem;">Реестр договоров</h3>
+                <div style="overflow-x: auto;">
+                    <table class="table-contract-list" style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border);">
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
+                                <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Статус</th>
+                                <th style="text-align: left; padding: 0.4rem 0.5rem;">Владелец</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in recent_contracts %}
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
+                                <td style="padding: 0.4rem 0.5rem;">
+                                    {% if r.status == 'draft' and r.tkp_id %}
+                                    <a href="{% url 'proposals:contract_form' r.tkp_id %}?contract_draft_id={{ r.pk }}">{{ r.number }}</a>
+                                    {% else %}
+                                    <a href="{% url 'proposals:contract_table' %}">{{ r.number }}</a>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
+                                <td style="padding: 0.4rem 0.5rem;">{{ r.service|default:"—" }}</td>
+                                <td style="padding: 0.4rem 0.5rem; text-align: right;">{{ r.sum_total|format_price }} ₽</td>
+                                <td style="padding: 0.4rem 0.5rem;">{% if r.status == 'draft' %}Черновик{% else %}Сформирован{% endif %}</td>
+                                <td style="padding: 0.4rem 0.5rem;">{% if r.created_by %}{{ r.created_by.get_full_name|default:r.created_by.username }}{% else %}—{% endif %}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" style="padding: 0.75rem; color: var(--text-muted);">Нет договоров</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p style="margin: 0.5rem 0 0;"><a href="{% url 'proposals:contract_table' %}" class="btn btn-secondary btn-sm">Весь реестр договоров</a></p>
+            </div>
+        </div>
+    </section>
+</div>
 {% endblock %}

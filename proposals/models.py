@@ -95,7 +95,21 @@ class TKPRecord(models.Model):
         default=STATUS_FINAL,
     )
     notes = models.TextField('Заметки по сделке', blank=True, default='')
+    rows_json = models.JSONField(
+        'Строки комплексного ТКП (позиции)',
+        null=True,
+        blank=True,
+        help_text='Список строк: service_name, comment, srok, unit, quantity, price_per_unit, total',
+    )
     created_at = models.DateTimeField('Создано', auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_tkp_records',
+        verbose_name='Владелец',
+    )
 
     class Meta:
         verbose_name = 'Запись ТКП'
@@ -164,6 +178,14 @@ class ContractRecord(models.Model):
     pdf_file = models.CharField('Файл PDF', max_length=255, blank=True)
     contract_snapshot = models.JSONField('Снимок реквизитов', null=True, blank=True)
     created_at = models.DateTimeField('Создано', auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_contract_records',
+        verbose_name='Владелец',
+    )
 
     class Meta:
         verbose_name = 'Запись договора'

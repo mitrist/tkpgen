@@ -301,6 +301,16 @@ class ContractForm(forms.Form):
     # Из ТКП: границы подготовки документации
     room = forms.CharField(label='Параметры объекта / помещение', required=False, widget=forms.Textarea(attrs={'rows': 2}))
     s = forms.CharField(label='Площадь / количество', max_length=100, required=False)
+    # Для комплексного ТКП: выбор типа договора (шаблон 05 или 08)
+    complex_contract_type = forms.ChoiceField(
+        label='Комплексный договор',
+        choices=[
+            ('', '— выберите —'),
+            ('05_Договор_Контент_Навигация.docx', 'Контент и навигация'),
+            ('08_Договор_ДПФ_Благоустройство.docx', 'ДПФ и Благоустройство'),
+        ],
+        required=False,
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

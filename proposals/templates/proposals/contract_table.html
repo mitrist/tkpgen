@@ -46,6 +46,7 @@
             <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=service&order={% if sort == 'service' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Услуга {% if sort == 'service' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
             <th style="text-align: right; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=sum_total&order={% if sort == 'sum_total' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Сумма {% if sort == 'sum_total' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?{% if filters.client %}client={{ filters.client|urlencode }}&{% endif %}{% if filters.service %}service={{ filters.service|urlencode }}&{% endif %}{% if filters.status %}status={{ filters.status|urlencode }}&{% endif %}sort=status&order={% if sort == 'status' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Статус договора {% if sort == 'status' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;">Владелец</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
         </tr>
     </thead>
@@ -70,6 +71,7 @@
                 <a href="#" class="btn btn-sm btn-contract-done btn-contract-card-trigger" data-contract-card="{% url 'proposals:contract_card' r.pk %}">Договор сформирован</a>
                 {% endif %}
             </td>
+            <td style="padding: 0.4rem 0.5rem;">{% if r.created_by %}{{ r.created_by.get_full_name|default:r.created_by.username }}{% else %}—{% endif %}</td>
             <td style="padding: 0.4rem 0.5rem;">
                 {% if r.docx_file and r.pdf_file %}
                 <a href="{% url 'proposals:contract_download' r.pk 'docx' %}" class="table-file-link">.docx</a>
@@ -81,7 +83,7 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="8" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет договоров</td>
+            <td colspan="9" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет договоров</td>
         </tr>
         {% endfor %}
     </tbody>
