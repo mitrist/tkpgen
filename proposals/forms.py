@@ -225,7 +225,7 @@ class ContractForm(forms.Form):
         input_formats=['%Y-%m-%d'],
         required=True,
     )
-    customer_name = forms.CharField(label='Наименование заказчика', max_length=500, required=True)
+    customer_name = forms.CharField(label='Наименование заказчика', max_length=500, required=False)  # дублирует контрагента, подставляется из выбора
     customer_represented_by = forms.CharField(
         label='В лице (р.п.)',
         max_length=255,
@@ -238,6 +238,48 @@ class ContractForm(forms.Form):
         required=False,
         help_text='ФИО в именительном падеже — второе вхождение в шаблоне',
     )
+    customer_in_person = forms.ChoiceField(
+        label='Заказчик в лице',
+        choices=[
+            ('', '— выберите —'),
+            ('Директора', 'Директора'),
+            ('Генерального директора', 'Генерального директора'),
+            ('И.О. Директора', 'И.О. Директора'),
+            ('Подписанта', 'Подписанта'),
+        ],
+        required=False,
+    )
+    acting_on_basis = forms.ChoiceField(
+        label='Действующего на основании',
+        choices=[
+            ('', '— выберите —'),
+            ('Устава', 'Устава'),
+            ('Приказа', 'Приказа'),
+            ('Доверенности', 'Доверенности'),
+            ('ОГРНИП', 'ОГРНИП'),
+        ],
+        required=False,
+    )
+    work_completion_period = forms.ChoiceField(
+        label='Срок выполнения работ',
+        choices=[
+            ('', '— выберите —'),
+            ('10 рабочих дней', '10 рабочих дней'),
+            ('20 рабочих дней', '20 рабочих дней'),
+            ('25 рабочих дней', '25 рабочих дней'),
+            ('35 рабочих дней', '35 рабочих дней'),
+        ],
+        required=False,
+    )
+    period_starts_from = forms.ChoiceField(
+        label='Срок отсчитывается от',
+        choices=[
+            ('', '— выберите —'),
+            ('внесения предоплаты по Договору Заказчиком', 'внесения предоплаты по Договору Заказчиком'),
+            ('с даты согласования макетов Заказчиком', 'с даты согласования макетов Заказчиком'),
+        ],
+        required=False,
+    )
     price = forms.DecimalField(label='Цена договора', max_digits=15, decimal_places=2, required=True)
     payment_terms = forms.CharField(
         label='Условия оплаты',
@@ -246,7 +288,7 @@ class ContractForm(forms.Form):
         widget=forms.Textarea(attrs={'rows': 4}),
     )
     # Реквизиты в подписи Заказчик
-    name = forms.CharField(label='Наименование (подпись)', max_length=500, required=False)
+    name = forms.CharField(label='Наименование', max_length=500, required=False)
     address = forms.CharField(label='Юридический адрес', required=False, widget=forms.Textarea(attrs={'rows': 2}))
     inn = forms.CharField(label='ИНН', max_length=12, required=False)
     kpp = forms.CharField(label='КПП', max_length=9, required=False)

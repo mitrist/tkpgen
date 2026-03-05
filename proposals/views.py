@@ -45,9 +45,17 @@ from .requisites_parser import FIELD_ORDER, parse_requisites_file
 COMPLEX_TEMPLATE_NAME = 'Шаблон 9 Комплексное ТКП.docx'
 UNIT_DISPLAY = {'m2': 'м²', 'piece': 'шт'}
 
-# Соответствие услуги ТКП → файл шаблона договора (в templates_docx)
+# Подпапка с шаблонами договоров (внутри TEMPLATES_DOCX_DIR)
+CONTRACT_TEMPLATES_SUBDIR = 'contracts_templates'
+
+# Соответствие услуги ТКП → файл шаблона договора (в templates_docx/contracts_templates/)
+# Услуга — Шаблон ТКП — Шаблон договора (см. README в contracts_templates)
 SERVICE_TO_CONTRACT_TEMPLATE = {
-    'ДП': 'Шаблон договора_Дизайн_проект.docx',
+    'ДП': '01_Договор_ДП.docx',
+    'ДКП': '02_Договор_ДК.docx',
+    'Навигация': '03_Договор_Навигация.docx',
+    'Фасад': '06_Договор_ДП_Фасад.docx',
+    'ДК Фасад': '07_Договор_ДК_Фасад.docx',
 }
 
 # Текст условий оплаты по умолчанию для договора
@@ -140,6 +148,43 @@ def _convert_docx_to_pdf(docx_path, out_dir):
         [cmd, '--headless', '--convert-to', 'pdf', '--outdir', str(out_dir), str(docx_path)],
         check=True,
     )
+
+
+CONTRACT_FONT_NAME = 'Times New Roman'
+
+
+def _set_contract_doc_font_times_new_roman(doc):
+    """Устанавливает шрифт Times New Roman для всего документа договора (параграфы и ячейки таблиц)."""
+    docx = doc.docx
+    for paragraph in docx.paragraphs:
+        for run in paragraph.runs:
+            run.font.name = CONTRACT_FONT_NAME
+    for table in docx.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.name = CONTRACT_FONT_NAME
+
+
+def _dolznost_from_customer_in_person(customer_in_person):
+    """
+    Возвращает должность (именительный падеж) по значению поля «Заказчик в лице».
+
+    customer_in_person:
+      - «Директора»             -> «Директор»
+      - «Генерального директора» -> «Генеральный директор»
+      - «И.О. Директора»        -> «И.о. Директора»
+      - «Подписанта»            -> «Подписант»
+    """
+    value = (customer_in_person or '').strip()
+    mapping = {
+        'Директора': 'Директор',
+        'Генерального директора': 'Генеральный директор',
+        'И.О. Директора': 'И.о. Директора',
+        'Подписанта': 'Подписант',
+    }
+    return mapping.get(value, '')
 
 
 def _sanitize_filename(name):
@@ -1059,7 +1104,7 @@ def contract_form_view(request, tkp_id):
         return redirect('proposals:table')
 
     templates_dir = getattr(settings, 'TEMPLATES_DOCX_DIR', Path(settings.BASE_DIR) / 'templates_docx')
-    template_path = templates_dir / contract_template_file
+    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
     if not template_path.exists():
         messages.error(request, f'Шаблон договора не найден: {contract_template_file}')
         return redirect('proposals:table')
@@ -1108,10 +1153,6 @@ def contract_form_view(request, tkp_id):
                     cp_for_initial = Counterparty.objects.get(pk=cp_id)
                 except (Counterparty.DoesNotExist, ValueError):
                     pass
-    if not cp_for_initial and tkp.client:
-        cp_for_initial = Counterparty.objects.filter(name__icontains=tkp.client).first()
-    if not cp_for_initial:
-        cp_for_initial = Counterparty.objects.first()
     if cp_for_initial:
         initial['counterparty'] = cp_for_initial.pk
         initial['customer_name'] = cp_for_initial.name or ''  # Наименование заказчика из карточки контрагента
@@ -1224,6 +1265,7 @@ def contract_form_view(request, tkp_id):
                 customer_represented_by = _director_genitive(cp.director or '')
             customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
             payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+            customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
             ctx = {
                 'contract_number': contract_number,
                 'number': contract_number,
@@ -1231,6 +1273,11 @@ def contract_form_view(request, tkp_id):
                 'customer_name': customer_name,
                 'customer_represented_by': customer_represented_by,
                 'customer_represented_by_nominative': customer_represented_by_nominative,
+                'customer_in_person': customer_in_person_raw,
+                'dolznost': _dolznost_from_customer_in_person(customer_in_person_raw),
+                'acting_on_basis': (cd.get('acting_on_basis') or '').strip(),
+                'work_completion_period': (cd.get('work_completion_period') or '').strip(),
+                'period_starts_from': (cd.get('period_starts_from') or '').strip(),
                 'price': _format_price(price_val),
                 'payment_terms': payment_terms,
                 'name': cd.get('name') or cp.name or '',
@@ -1248,6 +1295,7 @@ def contract_form_view(request, tkp_id):
             }
             doc = DocxTemplate(str(template_path))
             doc.render(ctx)
+            _set_contract_doc_font_times_new_roman(doc)
             buf = io.BytesIO()
             doc.save(buf)
             buf.seek(0)
@@ -1278,6 +1326,7 @@ def contract_form_view(request, tkp_id):
                 customer_represented_by = _director_genitive(cp.director or '')
             customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
             payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+            customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
             ctx = {
                 'contract_number': contract_number,
                 'number': contract_number,
@@ -1285,6 +1334,11 @@ def contract_form_view(request, tkp_id):
                 'customer_name': customer_name,
                 'customer_represented_by': customer_represented_by,
                 'customer_represented_by_nominative': customer_represented_by_nominative,
+                'customer_in_person': customer_in_person_raw,
+                'dolznost': _dolznost_from_customer_in_person(customer_in_person_raw),
+                'acting_on_basis': (cd.get('acting_on_basis') or '').strip(),
+                'work_completion_period': (cd.get('work_completion_period') or '').strip(),
+                'period_starts_from': (cd.get('period_starts_from') or '').strip(),
                 'price': _format_price(price_val),
                 'payment_terms': payment_terms,
                 'name': cd.get('name') or cp.name or '',
@@ -1302,6 +1356,7 @@ def contract_form_view(request, tkp_id):
             }
             doc = DocxTemplate(str(template_path))
             doc.render(ctx)
+            _set_contract_doc_font_times_new_roman(doc)
             out_format = (request.POST.get('format') or 'docx').strip().lower()
             if out_format != 'pdf':
                 out_format = 'docx'
@@ -1352,11 +1407,22 @@ def contract_form_view(request, tkp_id):
     else:
         form = ContractForm(initial=initial)
 
+    counterparty_display_name = ''
+    if request.method != 'POST' and cp_for_initial:
+        counterparty_display_name = cp_for_initial.name or ''
+    elif request.method == 'POST' and form.data.get('counterparty'):
+        try:
+            _cp = Counterparty.objects.get(pk=form.data.get('counterparty'))
+            counterparty_display_name = _cp.name or ''
+        except (Counterparty.DoesNotExist, ValueError, TypeError):
+            pass
+
     return render(request, 'proposals/contract_form.html', {
         'form': form,
         'tkp': tkp,
         'contract_template_file': contract_template_file,
         'contract_draft_id': contract_draft_id,
+        'counterparty_display_name': counterparty_display_name,
     })
 
 
@@ -1437,7 +1503,7 @@ def contract_save_from_editor_view(request):
 
     templates_dir = Path(getattr(settings, 'TEMPLATES_DOCX_DIR', settings.BASE_DIR / 'templates_docx'))
     template_filename = request.session.get(SESSION_KEY_EDITOR_TEMPLATE_FILE)
-    reference_doc = templates_dir / template_filename if template_filename else None
+    reference_doc = (templates_dir / CONTRACT_TEMPLATES_SUBDIR / template_filename) if template_filename else None
     extra_args = []
     if reference_doc and reference_doc.exists():
         extra_args.append('--reference-doc=' + str(reference_doc))
@@ -1489,6 +1555,26 @@ def contract_save_from_editor_view(request):
                 SESSION_KEY_EDITOR_DRAFT_ID, SESSION_KEY_EDITOR_TEMPLATE_FILE):
         request.session.pop(key, None)
     messages.success(request, 'Договор сохранён.')
+    save_format = (request.POST.get('save_format') or 'docx').strip().lower()
+    if save_format == 'pdf':
+        pdf_path = out_dir / f'{file_base}.pdf'
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            _convert_docx_to_pdf(docx_path, tmpdir)
+            src = tmpdir / f'{docx_path.stem}.pdf'  # LibreOffice: то же имя
+            if not src.exists():
+                src = tmpdir / 'tkp.pdf'  # docx2pdf
+            if not src.exists():
+                src = next(tmpdir.glob('*.pdf'), None)
+            if src and src.exists():
+                shutil.copy2(src, pdf_path)
+        if pdf_path.exists():
+            return FileResponse(
+                open(pdf_path, 'rb'),
+                as_attachment=True,
+                filename=f'{file_base}.pdf',
+            )
+        messages.warning(request, 'PDF не сформирован. Скачан DOCX. Установите LibreOffice или docx2pdf для генерации PDF.')
     return FileResponse(
         open(docx_path, 'rb'),
         as_attachment=True,
@@ -2074,14 +2160,23 @@ def requisites_add_view(request):
                     if inn and Counterparty.objects.filter(inn=inn).exists():
                         messages.warning(request, 'Контрагент уже заведён (такой ИНН есть в таблице Контрагенты).')
                     else:
-                        Counterparty.objects.create(**card_data)
+                        new_cp = Counterparty.objects.create(**card_data)
+                        tkp_id = request.GET.get('tkp_id')
+                        if request.GET.get('from') == 'contract' and tkp_id:
+                            messages.success(request, 'Карточка создана. Перейдите к вводу данных договора.')
+                            url = reverse('proposals:contract_form', args=[tkp_id]) + '?counterparty_id=' + str(new_cp.pk)
+                            return redirect(url)
                         messages.success(request, 'Карточка создана. Контрагент добавлен в таблицу Контрагенты.')
             else:
                 messages.error(request, 'Проверьте корректность заполнения полей.')
 
+    tkp_id = request.GET.get('tkp_id')
+    from_contract = request.GET.get('from') == 'contract'
     context = {
         'form': form,
         'card_data': card_data,
+        'tkp_id': tkp_id,
+        'from_contract': from_contract,
     }
     return render(request, 'proposals/requisites_form.html', context)
 

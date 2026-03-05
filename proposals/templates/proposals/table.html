@@ -91,7 +91,7 @@
                 {% elif contract_draft_for_row %}
                 <a href="{% url 'proposals:contract_form' r.pk %}?contract_draft_id={{ contract_draft_for_row.pk }}" class="btn btn-sm btn-contract-draft">Сохранен черновик договора</a>
                 {% elif r.service in contract_template_by_service %}
-                <a href="{% url 'proposals:contract_form' r.pk %}" class="btn btn-sm">Сформировать Договор</a>
+                <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract" class="btn btn-sm">Сформировать Договор</a>
                 {% else %}
                 —
                 {% endif %}

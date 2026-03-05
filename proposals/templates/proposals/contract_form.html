@@ -1,6 +1,27 @@
 {% extends "proposals/base.html" %}
 {% block title %}Реквизиты договора{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
 {% block content %}
+<style>
+.contract-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.5rem; }
+.contract-steps .step { width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.9rem; background: #e5e7eb; color: #6b7280; }
+.contract-steps .step.active { background: #45277B; color: #fff; }
+.contract-steps .step.done { background: #45277B; color: #fff; }
+.contract-steps .line { width: 3rem; height: 2px; background: #e5e7eb; }
+.contract-steps .line.done { background: #45277B; }
+.contract-form-wrap { width: 70%; max-width: 1000px; margin: 0 auto; }
+@media (max-width: 768px) { .contract-form-wrap { width: 100%; } }
+</style>
+
+<div class="contract-steps">
+    <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ tkp.pk }}&from=contract" class="step done" title="Выбор контрагента">1</a>
+    <span class="line done"></span>
+    <span class="step active" title="Ввод данных договора">2</span>
+    <span class="line"></span>
+    <span class="step" title="Редактор черновика">3</span>
+</div>
+
+<div class="contract-form-wrap">
 <h1>Реквизиты договора</h1>
 <p>ТКП: <strong>{{ tkp.number }}</strong> — {{ tkp.client|default:"—" }} ({{ tkp.service }}). Шаблон: {{ contract_template_file }}</p>
 
@@ -10,14 +31,16 @@
     {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
 
     <section style="margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Основные реквизиты (из ТКП)</h2>
+        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Основные реквизиты</h2>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
-                {{ form.counterparty.label_tag }}
-                {{ form.counterparty }}
-                <p style="margin: 0.35rem 0 0; font-size: 0.9rem;">
-                    <a href="{% url 'proposals:counterparties' %}?return_url={{ request.build_absolute_uri|urlencode }}">Выбрать из справочника «Контрагенты»</a>
-                </p>
+                <label for="id_counterparty_display">Заказчик (контрагент)</label>
+                <div class="counterparty-pick-row" style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+                    <input type="text" id="id_counterparty_display" value="{{ counterparty_display_name|default:'' }}" readonly placeholder="Выберите контрагента из справочника" style="flex: 1; margin-bottom: 0;">
+                    <input type="hidden" name="counterparty" id="id_counterparty" value="{{ form.counterparty.value|default:'' }}">
+                    <input type="hidden" name="customer_name" value="{{ counterparty_display_name|default:'' }}">
+                    <a href="{% url 'proposals:counterparties' %}?return_url={{ request.build_absolute_uri|urlencode }}" class="btn">Выбрать из справочника</a>
+                </div>
                 {% if form.counterparty.errors %}<ul class="errorlist">{{ form.counterparty.errors }}</ul>{% endif %}
             </div>
             <div>
@@ -30,18 +53,23 @@
                 {{ form.date }}
                 {% if form.date.errors %}<ul class="errorlist">{{ form.date.errors }}</ul>{% endif %}
             </div>
-            <div style="grid-column: 1 / -1;">
-                {{ form.customer_name.label_tag }}
-                {{ form.customer_name }}
-                {% if form.customer_name.errors %}<ul class="errorlist">{{ form.customer_name.errors }}</ul>{% endif %}
+            <div>
+                {{ form.customer_in_person.label_tag }}
+                {{ form.customer_in_person }}
+                {% if form.customer_in_person.errors %}<ul class="errorlist">{{ form.customer_in_person.errors }}</ul>{% endif %}
             </div>
-            <div style="grid-column: 1 / -1;">
+            <div>
+                {{ form.acting_on_basis.label_tag }}
+                {{ form.acting_on_basis }}
+                {% if form.acting_on_basis.errors %}<ul class="errorlist">{{ form.acting_on_basis.errors }}</ul>{% endif %}
+            </div>
+            <div>
                 {{ form.customer_represented_by.label_tag }}
                 {{ form.customer_represented_by }}
                 {% if form.customer_represented_by.help_text %}<p class="help">{{ form.customer_represented_by.help_text }}</p>{% endif %}
                 {% if form.customer_represented_by.errors %}<ul class="errorlist">{{ form.customer_represented_by.errors }}</ul>{% endif %}
             </div>
-            <div style="grid-column: 1 / -1;">
+            <div>
                 {{ form.customer_represented_by_nominative.label_tag }}
                 {{ form.customer_represented_by_nominative }}
                 {% if form.customer_represented_by_nominative.help_text %}<p class="help">{{ form.customer_represented_by_nominative.help_text }}</p>{% endif %}
@@ -52,6 +80,16 @@
                 {{ form.price }}
                 {% if form.price.errors %}<ul class="errorlist">{{ form.price.errors }}</ul>{% endif %}
             </div>
+            <div>
+                {{ form.work_completion_period.label_tag }}
+                {{ form.work_completion_period }}
+                {% if form.work_completion_period.errors %}<ul class="errorlist">{{ form.work_completion_period.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.period_starts_from.label_tag }}
+                {{ form.period_starts_from }}
+                {% if form.period_starts_from.errors %}<ul class="errorlist">{{ form.period_starts_from.errors }}</ul>{% endif %}
+            </div>
             <div style="grid-column: 1 / -1;">
                 {{ form.payment_terms.label_tag }}
                 {{ form.payment_terms }}
@@ -61,7 +99,7 @@
     </section>
 
     <section style="margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Заказчик (реквизиты в подписи)</h2>
+        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Реквизиты в подписи</h2>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div style="grid-column: 1 / -1;">
                 {{ form.name.label_tag }}
@@ -113,12 +151,6 @@
                 {{ form.email }}
                 {% if form.email.errors %}<ul class="errorlist">{{ form.email.errors }}</ul>{% endif %}
             </div>
-        </div>
-    </section>
-
-    <section style="margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Границы подготовки документации (из ТКП)</h2>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div style="grid-column: 1 / -1;">
                 {{ form.room.label_tag }}
                 {{ form.room }}
@@ -132,51 +164,14 @@
         </div>
     </section>
 
-    <div class="actions">
+    <div class="actions" style="justify-content: flex-end; gap: 0.5rem;">
         <button type="submit" name="format" value="docx" class="btn">Сформировать договор (DOCX)</button>
         <button type="submit" name="format" value="pdf" class="btn">Сформировать договор (PDF)</button>
-        <button type="submit" name="preview_edit" value="1" class="btn btn-secondary">Предпросмотр и редактирование черновика</button>
         <button type="submit" name="save_draft" value="1" class="btn btn-secondary">Сохранить как черновик</button>
+        <button type="submit" name="preview_edit" value="1" class="btn btn-secondary">Далее (просмотр и редактирование черновика)</button>
         <a href="{% url 'proposals:table' %}" class="btn btn-secondary">К реестру ТКП</a>
     </div>
 </form>
+</div>
 
-<script>
-(function() {
-    var jsonUrlTemplate = '{% url "proposals:counterparty_json" 0 %}';
-    var selectEl = document.getElementById('id_counterparty');
-
-    function setFieldValue(id, value) {
-        var el = document.getElementById(id);
-        if (el) el.value = value || '';
-    }
-
-    function fillFormFromCounterparty(data) {
-        setFieldValue('id_customer_name', data.name);
-        setFieldValue('id_customer_represented_by', data.director_genitive);
-        setFieldValue('id_customer_represented_by_nominative', data.director);
-        setFieldValue('id_name', data.name);
-        setFieldValue('id_address', data.address);
-        setFieldValue('id_inn', data.inn);
-        setFieldValue('id_kpp', data.kpp);
-        setFieldValue('id_ogrn', data.ogrn);
-        setFieldValue('id_account', data.account);
-        setFieldValue('id_bank', data.bank);
-        setFieldValue('id_bik', data.bik);
-        setFieldValue('id_kor_account', data.kor_account);
-        setFieldValue('id_email', data.email);
-    }
-
-    if (selectEl) {
-        selectEl.addEventListener('change', function() {
-            var id = this.value;
-            if (!id) return;
-            fetch(jsonUrlTemplate.replace('/0/', '/' + id + '/'))
-                .then(function(res) { return res.ok ? res.json() : Promise.reject(); })
-                .then(fillFormFromCounterparty)
-                .catch(function() {});
-        });
-    }
-})();
-</script>
 {% endblock %}

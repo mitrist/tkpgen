@@ -1,9 +1,33 @@
 {% extends "proposals/base.html" %}
 {% block title %}Добавление реквизитов{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
 {% block content %}
+<style>
+.requisites-form-wrap { width: 70%; max-width: 1000px; margin: 0 auto; }
+@media (max-width: 768px) { .requisites-form-wrap { width: 100%; } }
+{% if from_contract and tkp_id %}
+.contract-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.5rem; }
+.contract-steps .step { width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.9rem; background: #e5e7eb; color: #6b7280; text-decoration: none; }
+.contract-steps .step.active { background: #45277B; color: #fff; }
+.contract-steps .step.done { background: #45277B; color: #fff; }
+.contract-steps .line { width: 3rem; height: 2px; background: #e5e7eb; }
+.contract-steps .line.done { background: #45277B; }
+</style>
+{% endif %}
+{% if from_contract and tkp_id %}
+<div class="contract-steps">
+    <span class="step active" title="Выбор контрагента">1</span>
+    <span class="line"></span>
+    <a href="{% url 'proposals:contract_form' tkp_id %}" class="step" title="Ввод данных договора">2</a>
+    <span class="line"></span>
+    <span class="step" title="Редактор черновика">3</span>
+</div>
+{% endif %}
+
+<div class="requisites-form-wrap">
 <h1>Добавление реквизитов</h1>
 
-<form method="post" action="{% url 'proposals:requisites_add' %}" enctype="multipart/form-data">
+<form method="post" action="{% url 'proposals:requisites_add' %}{% if from_contract and tkp_id %}?tkp_id={{ tkp_id }}&from=contract{% endif %}" enctype="multipart/form-data">
     {% csrf_token %}
     {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
 
@@ -78,12 +102,17 @@
         </div>
     </div>
 
-    <div class="actions">
+    <div class="actions" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end;">
         <button type="submit" name="action" value="build">Создать карточку</button>
+        {% if from_contract and tkp_id %}
+        <a href="{% url 'proposals:contract_form' tkp_id %}" class="btn">Далее</a>
+        {% endif %}
     </div>
 </form>
+</div>
 
 {% if card_data %}
+<div class="requisites-form-wrap">
 <hr style="border: none; border-top: 1px solid var(--border); margin: 1.5rem 0;">
 <h2 style="margin-top: 0;">Карточка контрагента</h2>
 <div class="summary">
@@ -101,6 +130,7 @@
         <dt>Телефон</dt><dd>{{ card_data.phone|default:"—" }}</dd>
         <dt>Эл. почта</dt><dd>{{ card_data.email|default:"—" }}</dd>
     </dl>
+</div>
 </div>
 {% endif %}
 {% endblock %}
