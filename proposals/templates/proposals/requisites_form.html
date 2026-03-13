@@ -3,7 +3,7 @@
 {% block container_extra_class %}container--wide{% endblock %}
 {% block content %}
 <style>
-.requisites-form-wrap { width: 70%; max-width: 1000px; margin: 0 auto; }
+.requisites-form-wrap { width: 70%; max-width: 1000px; margin: 0 auto; min-height: 400px; }
 @media (max-width: 768px) { .requisites-form-wrap { width: 100%; } }
 {% if from_contract and tkp_id %}
 .contract-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.5rem; }
@@ -12,8 +12,8 @@
 .contract-steps .step.done { background: #45277B; color: #fff; }
 .contract-steps .line { width: 3rem; height: 2px; background: #e5e7eb; }
 .contract-steps .line.done { background: #45277B; }
-</style>
 {% endif %}
+</style>
 {% if from_contract and tkp_id %}
 <div class="contract-steps">
     <span class="step active" title="Выбор контрагента">1</span>
@@ -27,6 +27,7 @@
 
 <div class="requisites-form-wrap">
 <h1>Добавление реквизитов</h1>
+<p class="requisites-intro" style="margin: 0 0 1.25rem; font-size: 0.9375rem; color: var(--text-muted, #6b7280);">Добавьте контрагента: введите реквизиты вручную в поля ниже или загрузите файл карточки (DOCX/PDF) для автоматического извлечения. Затем нажмите «Создать карточку» — контрагент появится в <a href="{% url 'proposals:counterparties' %}">справочнике Контрагенты</a>.</p>
 
 <form method="post" action="{% url 'proposals:requisites_add' %}{% if from_contract and tkp_id %}?tkp_id={{ tkp_id }}&from=contract{% endif %}" enctype="multipart/form-data">
     {% csrf_token %}
@@ -134,4 +135,12 @@
 </div>
 </div>
 {% endif %}
+
+{% if not from_contract %}
+<p style="margin-top: 1.5rem;">
+    <a href="{% url 'proposals:counterparties' %}" class="btn btn-secondary">К справочнику контрагентов</a>
+    <a href="{% url 'proposals:start' %}" class="btn btn-secondary">На старт</a>
+</p>
+{% endif %}
+
 {% endblock %}

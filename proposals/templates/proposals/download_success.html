@@ -4,11 +4,104 @@
 <h1>ТКП сформировано</h1>
 <p>Скачайте файлы:</p>
 <div class="actions">
-    <a href="{% url 'proposals:download_file' 'pdf' %}?f={{ base_name }}" class="btn">Скачать PDF</a>
-    <a href="{% url 'proposals:download_file' 'docx' %}?f={{ base_name }}" class="btn btn-secondary">Скачать DOCX</a>
+    <a href="{% url 'proposals:download_file' 'pdf' %}?f={{ base_name|urlencode }}" class="btn">Скачать PDF</a>
+    <a href="{% url 'proposals:download_file' 'docx' %}?f={{ base_name|urlencode }}" class="btn btn-secondary">Скачать DOCX</a>
+    <button type="button" class="btn btn-secondary" id="btn-send-email-tkp" data-base-name="{{ base_name }}">Отправить по email</button>
 </div>
 <p style="margin-top: 1.5rem;">
     <a href="{% url 'proposals:form' %}" class="btn">Новое ТКП</a>
     <a href="{% url 'proposals:table' %}" class="btn btn-secondary">Перечень ТКП</a>
 </p>
+
+<div id="email-modal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-box" style="background: var(--bg, #fff); border-radius: 10px; max-width: 480px; width: 90%; padding: 1.25rem; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="margin: 0; font-size: 1.1rem;">Отправить по email</h2>
+            <button type="button" class="btn btn-secondary btn-sm modal-close-email" aria-label="Закрыть">×</button>
+        </div>
+        <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--text-muted, #6b7280);">PDF будет во вложении.</p>
+        <form id="email-form">
+            {% csrf_token %}
+            <input type="hidden" name="base_name" id="email-base-name" value="">
+            <div style="margin-bottom: 0.75rem;">
+                <label for="email-to" style="display: block; font-size: 0.9rem; margin-bottom: 0.25rem;">Кому (email) *</label>
+                <input type="email" name="to_email" id="email-to" required style="width: 100%; padding: 0.5rem; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 0.75rem;">
+                <label for="email-subject" style="display: block; font-size: 0.9rem; margin-bottom: 0.25rem;">Тема</label>
+                <input type="text" name="subject" id="email-subject" style="width: 100%; padding: 0.5rem; box-sizing: border-box;" placeholder="ТКП">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label for="email-body" style="display: block; font-size: 0.9rem; margin-bottom: 0.25rem;">Текст письма</label>
+                <textarea name="body" id="email-body" rows="4" style="width: 100%; padding: 0.5rem; box-sizing: border-box;"></textarea>
+            </div>
+            <div id="email-form-error" style="color: #b91c1c; font-size: 0.875rem; margin-bottom: 0.5rem; display: none;"></div>
+            <div id="email-form-success" style="color: #15803d; font-size: 0.875rem; margin-bottom: 0.5rem; display: none;"></div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary modal-close-email">Отмена</button>
+                <button type="submit" class="btn">Отправить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    var modal = document.getElementById('email-modal');
+    var form = document.getElementById('email-form');
+    var baseNameInput = document.getElementById('email-base-name');
+    var openBtn = document.getElementById('btn-send-email-tkp');
+    var closeBtns = document.querySelectorAll('.modal-close-email');
+    var errEl = document.getElementById('email-form-error');
+    var successEl = document.getElementById('email-form-success');
+    var submitUrl = '{% url "proposals:send_tkp_email" %}';
+
+    function showModal(baseName) {
+        baseNameInput.value = baseName || '';
+        document.getElementById('email-to').value = '';
+        document.getElementById('email-subject').value = 'ТКП ' + (baseName || '');
+        document.getElementById('email-body').value = 'Добрый день.\n\nВо вложении ТКП в формате PDF.';
+        errEl.style.display = 'none';
+        successEl.style.display = 'none';
+        if (modal) modal.style.display = 'flex';
+    }
+    function hideModal() {
+        if (modal) modal.style.display = 'none';
+    }
+    if (openBtn) {
+        openBtn.addEventListener('click', function() {
+            showModal(openBtn.getAttribute('data-base-name') || '');
+        });
+    }
+    closeBtns.forEach(function(btn) { btn.addEventListener('click', hideModal); });
+    if (modal) modal.addEventListener('click', function(e) { if (e.target === modal) hideModal(); });
+
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            errEl.style.display = 'none';
+            successEl.style.display = 'none';
+            var fd = new FormData(form);
+            var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrf) fd.set('csrfmiddlewaretoken', csrf.value);
+            fetch(submitUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.ok) {
+                        successEl.textContent = data.message || 'Письмо отправлено.';
+                        successEl.style.display = 'block';
+                        setTimeout(hideModal, 1500);
+                    } else {
+                        errEl.textContent = data.error || 'Ошибка отправки';
+                        errEl.style.display = 'block';
+                    }
+                })
+                .catch(function() {
+                    errEl.textContent = 'Ошибка сети или сервера.';
+                    errEl.style.display = 'block';
+                });
+        });
+    }
+})();
+</script>
 {% endblock %}

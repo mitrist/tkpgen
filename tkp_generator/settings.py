@@ -101,3 +101,11 @@ LOGOUT_REDIRECT_URL = '/accounts/login/'
 TEMPLATES_DOCX_DIR = BASE_DIR / 'templates_docx'
 # Папка для сформированных PDF и DOCX (скачивание)
 TKP_OUTPUT_DIR = BASE_DIR / 'TKP_output'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.yandex.ru'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = '...'
+EMAIL_HOST_PASSWORD = '...'
+DEFAULT_FROM_EMAIL = 'mitrist12@yandex.com'

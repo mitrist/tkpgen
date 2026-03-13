@@ -12,6 +12,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.mail import EmailMessage
 from django.db.models import Max
 from django.http import FileResponse, Http404, JsonResponse
 from django.contrib import messages
@@ -592,6 +593,46 @@ def download_file_view(request, file_type):
         as_attachment=True,
         filename=path.name,
     )
+
+
+def _validate_tkp_base_name(base_name):
+    """Проверка base_name и путь к PDF в TKP_output. Возвращает (path, error)."""
+    if not base_name or not re.match(r'^[a-zA-Z0-9_\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
+        return None, 'Недопустимое имя файла'
+    out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
+    path = out_dir / f'{base_name}.pdf'
+    if not path.exists():
+        return None, 'Файл PDF не найден'
+    return path, None
+
+
+@login_required
+@require_http_methods(['POST'])
+def send_tkp_pdf_email_view(request):
+    """Отправка PDF ТКП по email. POST: base_name, to_email, subject, body."""
+    base_name = (request.POST.get('base_name') or '').strip()
+    to_email = (request.POST.get('to_email') or '').strip()
+    subject = (request.POST.get('subject') or '').strip()
+    body = (request.POST.get('body') or '').strip()
+    if not to_email:
+        return JsonResponse({'ok': False, 'error': 'Укажите адрес получателя.'})
+    path, err = _validate_tkp_base_name(base_name)
+    if err:
+        return JsonResponse({'ok': False, 'error': err})
+    try:
+        with open(path, 'rb') as f:
+            pdf_data = f.read()
+        msg = EmailMessage(
+            subject=subject or f'ТКП {base_name}',
+            body=body or 'Во вложении ТКП в формате PDF.',
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', settings.SERVER_EMAIL or 'noreply@localhost'),
+            to=[to_email],
+            attachments=[(f'{base_name}.pdf', pdf_data, 'application/pdf')],
+        )
+        msg.send()
+        return JsonResponse({'ok': True, 'message': 'Письмо отправлено.'})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
 
 
 def _parse_complex_rows(rows_data):

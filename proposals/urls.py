@@ -29,6 +29,7 @@ urlpatterns = [
     path('complex/confirm/', views.complex_confirm_view, name='complex_confirm'),
     path('confirm/', views.confirm_view, name='confirm'),
     path('download-success/', views.download_success_view, name='download_success'),
+    path('send-tkp-email/', views.send_tkp_pdf_email_view, name='send_tkp_email'),
     path('download/<str:file_type>/', views.download_file_view, name='download_file'),
     path('start/', views.start_view, name='start'),
     path('instruction/', views.instruction_view, name='instruction'),
