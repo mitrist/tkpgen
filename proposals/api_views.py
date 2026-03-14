@@ -195,7 +195,7 @@ def telegram_process_view(request):
         text = ''
     elif text is not None and not isinstance(text, str):
         text = str(text)
-    reply_text, error, inline_keyboard, document_path = process_telegram_message(
+    reply_text, error, inline_keyboard, document_path, web_app_url, web_app_button_text = process_telegram_message(
         chat_id, user_id, text=text or None, callback_data=callback_data,
     )
     return JsonResponse({
@@ -203,4 +203,6 @@ def telegram_process_view(request):
         'error': error,
         'inline_keyboard': inline_keyboard,
         'document_path': document_path,
+        'web_app_url': web_app_url,
+        'web_app_button_text': web_app_button_text,
     })

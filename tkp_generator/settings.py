@@ -118,5 +118,7 @@ TKP_TELEGRAM_BOT_USER_ID = _env('TKP_TELEGRAM_BOT_USER_ID', '') or None
 # Telegram бот и OpenClaw для моста ТКП
 TELEGRAM_BOT_TOKEN = _env('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_WEBHOOK_SECRET = _env('TELEGRAM_WEBHOOK_SECRET', '') or None
+# URL сайта для Mini App (HTTPS в проде): например https://nacpro-web-service.ru
+TKP_MINIAPP_BASE_URL = (_env('TKP_MINIAPP_BASE_URL', '') or '').rstrip('/')
 OPENCLAW_GATEWAY_URL = _env('OPENCLAW_GATEWAY_URL', '')
 OPENCLAW_API_KEY = _env('OPENCLAW_API_KEY', '')

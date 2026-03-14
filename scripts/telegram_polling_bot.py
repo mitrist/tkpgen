@@ -116,6 +116,27 @@ def send_document(client: httpx.Client, token: str, chat_id: int, file_path: str
         return False
 
 
+def send_webapp_button(
+    client: httpx.Client, token: str, chat_id: int, text: str, button_text: str, web_app_url: str
+) -> bool:
+    """Send message with button that opens a Web App (Mini App)."""
+    url = f"{TELEGRAM_API_BASE}{token}/sendMessage"
+    try:
+        markup = {
+            "inline_keyboard": [[{"text": button_text, "web_app": {"url": web_app_url}}]],
+        }
+        r = client.post(
+            url,
+            json={"chat_id": chat_id, "text": text or " ", "reply_markup": markup},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return True
+    except (httpx.HTTPError, ValueError) as e:
+        logger.warning("sendMessage with web_app failed for chat_id=%s: %s", chat_id, e)
+        return False
+
+
 def answer_callback_query(client: httpx.Client, token: str, callback_query_id: str) -> None:
     try:
         url = f"{TELEGRAM_API_BASE}{token}/answerCallbackQuery"
@@ -183,12 +204,16 @@ def _send_response(client: httpx.Client, token: str, chat_id: int, data: dict) -
     error_msg = data.get("error")
     inline_keyboard = data.get("inline_keyboard")
     document_path = data.get("document_path")
+    web_app_url = data.get("web_app_url")
+    web_app_button_text = data.get("web_app_button_text")
     if error_msg:
         send_message(client, token, chat_id, f"Ошибка: {error_msg[:500]}")
         return
     if document_path:
         send_document(client, token, chat_id, document_path)
-    if reply_text:
+    if web_app_url and web_app_button_text:
+        send_webapp_button(client, token, chat_id, reply_text or " ", web_app_button_text, web_app_url)
+    elif reply_text:
         if inline_keyboard:
             send_message_with_keyboard(client, token, chat_id, reply_text, inline_keyboard)
         else:

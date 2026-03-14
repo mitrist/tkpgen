@@ -217,7 +217,8 @@ def _apply_callback(draft, callback_data):
 def process_text_message(chat_id, user_id, text):
     """
     Обработка текстового сообщения от пользователя.
-    Возвращает dict: reply_text, error, inline_keyboard (list of rows), document_path.
+    Возвращает dict: reply_text, error, inline_keyboard (list of rows), document_path,
+    опционально web_app_url, web_app_button_text (для кнопки открытия Mini App).
     """
     if text == '/start':
         draft = get_or_create_draft(user_id, chat_id)
@@ -226,6 +227,24 @@ def process_text_message(chat_id, user_id, text):
             'reply_text': 'Здравствуйте. Я помогу сформировать ТКП. ' + prompt,
             'error': None,
             'inline_keyboard': rows,
+            'document_path': None,
+        }
+    # Команда открытия Mini App (форма ТКП в WebView)
+    if (text or '').strip().lower() in ('/app', '/tkp'):
+        base = (getattr(settings, 'TKP_MINIAPP_BASE_URL', '') or '').strip()
+        if base:
+            return {
+                'reply_text': 'Откройте форму ТКП по кнопке ниже.',
+                'error': None,
+                'inline_keyboard': None,
+                'document_path': None,
+                'web_app_url': base + '/tkp-app/',
+                'web_app_button_text': 'Открыть форму ТКП',
+            }
+        return {
+            'reply_text': 'Mini App не настроен (TKP_MINIAPP_BASE_URL). Используйте диалог с кнопками.',
+            'error': None,
+            'inline_keyboard': None,
             'document_path': None,
         }
     if not (text or '').strip():

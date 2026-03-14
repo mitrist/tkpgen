@@ -104,10 +104,30 @@ def _telegram_answer_callback_query(callback_query_id, token=None, text=None):
         logger.debug('answerCallbackQuery failed: %s', e)
 
 
+def _telegram_send_webapp_button(chat_id, text, button_text, web_app_url, token=None):
+    """Отправить сообщение с кнопкой, открывающей Mini App (Web App)."""
+    token = token or getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
+    if not token:
+        logger.warning('TELEGRAM_BOT_TOKEN not set')
+        return False
+    try:
+        import httpx
+        url = f'https://api.telegram.org/bot{token}/sendMessage'
+        markup = {
+            'inline_keyboard': [[{'text': button_text, 'web_app': {'url': web_app_url}}]],
+        }
+        r = httpx.post(url, json={'chat_id': chat_id, 'text': (text or ' ')[:4096], 'reply_markup': markup}, timeout=15.0)
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        logger.exception('Telegram sendMessage with web_app failed: %s', e)
+        return False
+
+
 def process_telegram_message(chat_id, user_id, text=None, callback_data=None):
     """
-    Обработка сообщения или нажатия кнопки. Возвращает (reply_text, error, inline_keyboard, document_path).
-    Для совместимости с api telegram_process_view: вызывающий код может отправлять reply сам.
+    Обработка сообщения или нажатия кнопки.
+    Возвращает (reply_text, error, inline_keyboard, document_path, web_app_url, web_app_button_text).
     """
     if callback_data is not None:
         result = bot_logic.process_callback(chat_id, user_id, callback_data)
@@ -118,6 +138,8 @@ def process_telegram_message(chat_id, user_id, text=None, callback_data=None):
         result.get('error'),
         result.get('inline_keyboard'),
         result.get('document_path'),
+        result.get('web_app_url'),
+        result.get('web_app_button_text'),
     )
 
 
@@ -149,11 +171,13 @@ def telegram_webhook_view(request):
         if not chat_id or not user_id:
             return HttpResponse('ok')
         _telegram_answer_callback_query(cq_id)
-        reply_text, err, keyboard, document_path = process_telegram_message(
+        reply_text, err, keyboard, document_path, web_app_url, web_app_button_text = process_telegram_message(
             chat_id, user_id, callback_data=data,
         )
         if err:
             _telegram_send_message(chat_id, f'Ошибка: {err[:500]}')
+        elif web_app_url and web_app_button_text:
+            _telegram_send_webapp_button(chat_id, reply_text or ' ', web_app_button_text, web_app_url)
         elif document_path:
             _telegram_send_document(chat_id, document_path)
             if reply_text:
@@ -178,13 +202,15 @@ def telegram_webhook_view(request):
     if not chat_id or not user_id:
         return HttpResponse('ok')
 
-    reply_text, err, keyboard, document_path = process_telegram_message(chat_id, user_id, text=text)
+    reply_text, err, keyboard, document_path, web_app_url, web_app_button_text = process_telegram_message(chat_id, user_id, text=text)
     if err:
         _telegram_send_message(chat_id, f'Ошибка: {err[:500]}')
     elif document_path:
         _telegram_send_document(chat_id, document_path)
         if reply_text:
             _telegram_send_message(chat_id, reply_text)
+    elif web_app_url and web_app_button_text:
+        _telegram_send_webapp_button(chat_id, reply_text or ' ', web_app_button_text, web_app_url)
     elif reply_text:
         if keyboard:
             _telegram_send_message_with_keyboard(chat_id, reply_text, keyboard)
