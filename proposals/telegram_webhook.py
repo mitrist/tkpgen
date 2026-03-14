@@ -171,6 +171,8 @@ def _call_openclaw(user_id, instructions, input_messages, tools, draft_id):
     headers = {'Content-Type': 'application/json'}
     if api_key:
         headers['Authorization'] = f'Bearer {api_key}'
+    # Выбор агента (в примерах docs — x-openclaw-agent-id: main)
+    headers['x-openclaw-agent-id'] = 'main'
 
     # input: массив сообщений в формате OpenResponses
     input_items = []
@@ -212,15 +214,37 @@ def _call_openclaw(user_id, instructions, input_messages, tools, draft_id):
         return None, str(e)
 
     # Разбор ответа: output может содержать message и/или function_call
+    # message: content — строка или массив частей [{"type": "output_text", "text": "..."}]
     output = data.get('output') or []
     reply_text = ''
     function_calls = []
 
-    for item in output:
+    def _text_from_item(item):
         if item.get('type') == 'message' and item.get('role') == 'assistant':
-            reply_text = (item.get('content') or '').strip()
+            content = item.get('content')
+            if isinstance(content, str):
+                return content.strip()
+            if isinstance(content, list):
+                parts = []
+                for p in content:
+                    if isinstance(p, dict) and p.get('type') == 'output_text':
+                        parts.append((p.get('text') or '').strip())
+                    elif isinstance(p, dict) and 'text' in p:
+                        parts.append(str(p.get('text', '')).strip())
+                return ' '.join(p for p in parts if p)
+        if item.get('type') == 'output_text':
+            return (item.get('text') or '').strip()
+        return ''
+
+    for item in output:
+        t = _text_from_item(item)
+        if t:
+            reply_text = t
         if item.get('type') == 'function_call':
             function_calls.append(item)
+
+    if not reply_text and not function_calls and output:
+        logger.warning('OpenClaw returned output but no message text parsed. output sample: %s', json.dumps(output[:3])[:1500])
 
     # Если есть function_call — выполнить и отправить ещё один запрос
     for fc in function_calls:
@@ -264,8 +288,9 @@ def _call_openclaw(user_id, instructions, input_messages, tools, draft_id):
         out2 = data2.get('output') or []
         reply_text = ''
         for item in out2:
-            if item.get('type') == 'message' and item.get('role') == 'assistant':
-                reply_text = (item.get('content') or '').strip()
+            t = _text_from_item(item)
+            if t:
+                reply_text = t
         # Один цикл на один function_call; при нескольких вызовах можно повторить
         break
 
@@ -331,5 +356,8 @@ def telegram_webhook_view(request):
     if reply_text:
         _append_to_history(user_id, 'assistant', reply_text)
         _telegram_send_message(chat_id, reply_text)
+    else:
+        logger.warning('OpenClaw returned no reply text for user_id=%s', user_id)
+        _telegram_send_message(chat_id, 'Не удалось получить ответ. Попробуйте ещё раз или переформулируйте.')
 
     return HttpResponse('ok')
