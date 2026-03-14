@@ -2,7 +2,8 @@ from django.urls import path
 from . import views
 from .telegram_webhook import telegram_webhook_view
 from .telegram_miniapp import (
-    miniapp_page_view,
+    miniapp_menu_view,
+    miniapp_form_view,
     miniapp_reference_view,
     miniapp_submit_view,
     miniapp_download_view,
@@ -12,7 +13,8 @@ app_name = 'proposals'
 
 urlpatterns = [
     path('telegram/webhook/', telegram_webhook_view),
-    path('tkp-app/', miniapp_page_view),
+    path('tkp-app/', miniapp_menu_view),
+    path('tkp-app/form/', miniapp_form_view),
     path('tkp-app/reference/', miniapp_reference_view),
     path('tkp-app/submit/', miniapp_submit_view),
     path('tkp-app/download/<str:token>/', miniapp_download_view),

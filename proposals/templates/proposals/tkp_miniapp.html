@@ -100,6 +100,8 @@
     }
     #status.error { color: #dc2626; }
     #status.success { color: var(--success); }
+    .field-error { font-size: 0.8125rem; color: #dc2626; margin-top: 0.25rem; }
+    .field.has-error input, .field.has-error select, .field.has-error textarea { border-color: #dc2626; }
     .download-block.hidden { display: none; }
     .download-block .download-message { margin: 1rem 0 0.75rem; color: var(--text); font-size: 0.9375rem; }
     .download-buttons { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
@@ -122,6 +124,7 @@
     <h1>Генератор ТКП</h1>
   </header>
   <main class="app-main">
+    <p style="margin: 0 0 0.75rem; font-size: 0.9375rem;"><a href="/tkp-app/" style="color: var(--primary); text-decoration: none;">← Меню</a></p>
     <div class="card">
       <h2>Форма ТКП</h2>
       <form id="form">
@@ -201,13 +204,132 @@
         tg.expand();
       }
 
+      function haptic(type) {
+        if (tg && tg.HapticFeedback) {
+          if (type === 'impact') tg.HapticFeedback.impactOccurred('light');
+          else if (type === 'selection') tg.HapticFeedback.selectionChanged();
+        }
+      }
+
       const form = document.getElementById('form');
       const statusEl = document.getElementById('status');
       const btnSubmit = document.getElementById('btnSubmit');
+      const downloadBlock = document.getElementById('download-block');
+
+      // ——— Back Button ———
+      if (tg && tg.BackButton) {
+        tg.BackButton.show();
+        tg.BackButton.onClick(function() {
+          haptic('selection');
+          window.location.href = '/tkp-app/';
+        });
+      }
+
+      // ——— Подстановка даты по умолчанию ———
+      var dateInput = form.querySelector('input[name="date"]');
+      if (dateInput && !dateInput.value) {
+        var today = new Date();
+        dateInput.value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      }
 
       function setStatus(msg, isError) {
         statusEl.textContent = msg || '';
         statusEl.className = msg ? (isError ? 'error' : 'success') : '';
+      }
+
+      function clearFieldErrors() {
+        form.querySelectorAll('.field').forEach(function(f) { f.classList.remove('has-error'); });
+        form.querySelectorAll('.field-error').forEach(function(el) { el.remove(); });
+      }
+
+      function showFieldError(fieldWrap, message) {
+        if (!fieldWrap) return;
+        fieldWrap.classList.add('has-error');
+        var existing = fieldWrap.querySelector('.field-error');
+        if (existing) existing.textContent = message;
+        else {
+          var err = document.createElement('span');
+          err.className = 'field-error';
+          err.textContent = message;
+          fieldWrap.appendChild(err);
+        }
+      }
+
+      /** Валидация формы: дата и услуга обязательны; для внешнего — клиент; площадь — число при заполнении. */
+      function validateForm() {
+        clearFieldErrors();
+        var isInternal = form.querySelector('input[name="is_internal"]:checked').value === '1';
+        var valid = true;
+        var dateVal = (form.querySelector('input[name="date"]').value || '').trim();
+        if (!dateVal) {
+          showFieldError(form.querySelector('input[name="date"]').closest('.field'), 'Укажите дату ТКП');
+          valid = false;
+        }
+        var serviceVal = (form.querySelector('select[name="service_id"]').value || '').trim();
+        if (!serviceVal) {
+          showFieldError(form.querySelector('select[name="service_id"]').closest('.field'), 'Выберите услугу');
+          valid = false;
+        }
+        if (!isInternal) {
+          var clientVal = (form.querySelector('input[name="client"]').value || '').trim();
+          if (!clientVal) {
+            showFieldError(document.getElementById('wrap-client'), 'Укажите наименование клиента');
+            valid = false;
+          }
+          var sVal = (form.querySelector('input[name="s"]').value || '').trim();
+          if (sVal && isNaN(parseFloat(sVal))) {
+            showFieldError(document.getElementById('wrap-s'), 'Введите число');
+            valid = false;
+          }
+        } else {
+          var internalPrice = (form.querySelector('input[name="internal_price"]').value || '').trim();
+          if (internalPrice && isNaN(parseFloat(internalPrice))) {
+            showFieldError(document.getElementById('wrap-internal_price'), 'Введите число');
+            valid = false;
+          }
+        }
+        var srokVal = (form.querySelector('select[name="srok"]').value || '').trim();
+        if (!srokVal) {
+          showFieldError(form.querySelector('select[name="srok"]').closest('.field'), 'Выберите срок разработки');
+          valid = false;
+        }
+        return valid;
+      }
+
+      function isFormValidForSubmit() {
+        var isInternal = form.querySelector('input[name="is_internal"]:checked').value === '1';
+        var dateVal = (form.querySelector('input[name="date"]').value || '').trim();
+        var serviceVal = (form.querySelector('select[name="service_id"]').value || '').trim();
+        var srokVal = (form.querySelector('select[name="srok"]').value || '').trim();
+        if (!dateVal || !serviceVal || !srokVal) return false;
+        if (!isInternal) {
+          var clientVal = (form.querySelector('input[name="client"]').value || '').trim();
+          if (!clientVal) return false;
+          var sVal = (form.querySelector('input[name="s"]').value || '').trim();
+          if (sVal && isNaN(parseFloat(sVal))) return false;
+        } else {
+          var internalPrice = (form.querySelector('input[name="internal_price"]').value || '').trim();
+          if (internalPrice && isNaN(parseFloat(internalPrice))) return false;
+        }
+        return true;
+      }
+
+      function updateMainButton() {
+        if (!tg || !tg.MainButton) return;
+        var show = !downloadBlock.classList.contains('hidden') ? false : !btnSubmit.disabled && isFormValidForSubmit();
+        if (show) {
+          tg.MainButton.setText('Сформировать ТКП');
+          tg.MainButton.show();
+        } else {
+          tg.MainButton.hide();
+        }
+      }
+
+      if (tg && tg.MainButton) {
+        tg.MainButton.onClick(function() {
+          haptic('impact');
+          if (validateForm()) form.requestSubmit();
+        });
       }
 
       function toggleInternal(isInternal) {
@@ -217,11 +339,17 @@
         document.getElementById('wrap-region').classList.toggle('hidden', v);
         document.getElementById('wrap-client').classList.toggle('hidden', v);
         document.getElementById('wrap-s').classList.toggle('hidden', v);
+        updateMainButton();
       }
       form.querySelectorAll('input[name="is_internal"]').forEach(function(radio) {
-        radio.addEventListener('change', function() { toggleInternal(radio.value === '1'); });
+        radio.addEventListener('change', function() { haptic('selection'); toggleInternal(radio.value === '1'); });
       });
       toggleInternal(false);
+
+      form.querySelectorAll('input, select, textarea').forEach(function(el) {
+        el.addEventListener('input', updateMainButton);
+        el.addEventListener('change', function() { clearFieldErrors(); updateMainButton(); });
+      });
 
       const baseUrl = window.location.origin;
 
@@ -256,6 +384,7 @@
             opt.textContent = s.label;
             selSrok.appendChild(opt);
           });
+          updateMainButton();
         })
         .catch(function(e) {
           setStatus('Не удалось загрузить справочники.', true);
@@ -263,13 +392,19 @@
 
       form.addEventListener('submit', function(e) {
         e.preventDefault();
+        if (!validateForm()) {
+          haptic('impact');
+          setStatus('Заполните обязательные поля.', true);
+          return;
+        }
         const initData = tg ? tg.initData : '';
         if (!initData) {
           setStatus('Откройте приложение из Telegram.', true);
           return;
         }
-        const fd = new FormData(form);
-        const payload = {
+        haptic('impact');
+        var fd = new FormData(form);
+        var payload = {
           initData: initData,
           start_param: (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || ''
         };
@@ -278,6 +413,7 @@
         });
         payload.is_internal = payload.is_internal === '1';
         btnSubmit.disabled = true;
+        if (tg && tg.MainButton) tg.MainButton.hide();
         setStatus('Формирую документ…', false);
         fetch(baseUrl + '/tkp-app/submit/', {
           method: 'POST',
@@ -310,9 +446,11 @@
             }
             block.classList.remove('hidden');
             block.querySelector('.download-message').textContent = 'Скачайте файл в нужном формате:';
+            updateMainButton();
             [btnPdf, btnDocx].forEach(function(btn) {
               btn.onclick = function(e) {
                 if (btn.href && btn.href !== '#' && !btn.classList.contains('hidden')) {
+                  haptic('selection');
                   if (tg && tg.openLink) {
                     e.preventDefault();
                     tg.openLink(btn.href);
@@ -324,6 +462,7 @@
           .catch(function(err) {
             setStatus(err.message || 'Ошибка отправки', true);
             btnSubmit.disabled = false;
+            updateMainButton();
           });
       });
     })();

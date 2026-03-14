@@ -105,7 +105,7 @@ def _telegram_answer_callback_query(callback_query_id, token=None, text=None):
 
 
 def _telegram_send_webapp_button(chat_id, text, button_text, web_app_url, token=None):
-    """Отправить сообщение с кнопкой, открывающей Mini App (Web App)."""
+    """Отправить сообщение с инлайн-кнопкой, открывающей Mini App (Web App)."""
     token = token or getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
     if not token:
         logger.warning('TELEGRAM_BOT_TOKEN not set')
@@ -121,6 +121,35 @@ def _telegram_send_webapp_button(chat_id, text, button_text, web_app_url, token=
         return True
     except Exception as e:
         logger.exception('Telegram sendMessage with web_app failed: %s', e)
+        return False
+
+
+def _telegram_send_reply_keyboard_webapp(chat_id, text, button_text, web_app_url, token=None):
+    """Отправить сообщение с обычной (Reply) кнопкой, открывающей Mini App. Кнопка остаётся под полем ввода."""
+    token = token or getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
+    if not token:
+        logger.warning('TELEGRAM_BOT_TOKEN not set')
+        return False
+    if not web_app_url or not button_text:
+        return False
+    try:
+        import httpx
+        url = f'https://api.telegram.org/bot{token}/sendMessage'
+        markup = {
+            'keyboard': [[{'text': button_text, 'web_app': {'url': web_app_url}}]],
+            'resize_keyboard': True,
+            'one_time_keyboard': False,
+        }
+        payload = {'chat_id': chat_id, 'reply_markup': markup}
+        if text:
+            payload['text'] = str(text)[:4096]
+        else:
+            payload['text'] = ' '
+        r = httpx.post(url, json=payload, timeout=15.0)
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        logger.exception('Telegram sendMessage with reply_keyboard web_app failed: %s', e)
         return False
 
 
@@ -216,5 +245,16 @@ def telegram_webhook_view(request):
             _telegram_send_message_with_keyboard(chat_id, reply_text, keyboard)
         else:
             _telegram_send_message(chat_id, reply_text)
+
+    # По /start показываем постоянную кнопку «Открыть приложение» (Reply Keyboard, не инлайн)
+    if (text or '').strip() == '/start':
+        base = (getattr(settings, 'TKP_MINIAPP_BASE_URL', '') or '').strip()
+        if base:
+            _telegram_send_reply_keyboard_webapp(
+                chat_id,
+                'Откройте приложение по кнопке ниже.',
+                'Открыть приложение',
+                base + '/tkp-app/',
+            )
 
     return HttpResponse('ok')

@@ -134,8 +134,14 @@ def _draft_from_form_data(telegram_user_id, telegram_chat_id, data):
 
 
 @require_http_methods(['GET'])
-def miniapp_page_view(request):
-    """Страница Mini App: форма ТКП. GET /tkp-app/"""
+def miniapp_menu_view(request):
+    """Первая страница Mini App: меню (список разделов как в боковом меню веб-приложения). GET /tkp-app/"""
+    return render(request, 'proposals/tkp_miniapp_menu.html', {})
+
+
+@require_http_methods(['GET'])
+def miniapp_form_view(request):
+    """Страница Mini App: форма ТКП на одну услугу. GET /tkp-app/form/"""
     return render(request, 'proposals/tkp_miniapp.html', {})
 
 
@@ -201,13 +207,14 @@ def miniapp_submit_view(request):
 
 @require_http_methods(['GET'])
 def miniapp_download_view(request, token):
-    """GET /tkp-app/download/<token>/ — отдать файл по одноразовому токену."""
+    """GET /tkp-app/download/<token>/ — отдать файл по токену (действует до TTL, без удаления после выдачи)."""
     if not token or not token.startswith(DOWNLOAD_TOKEN_PREFIX):
         return HttpResponse('Invalid token', status=404)
     file_path = cache.get(token)
     if not file_path:
         return HttpResponse('Link expired', status=404)
-    cache.delete(token)
+    # Не удаляем токен после выдачи: Telegram/браузер могут делать два запроса (префетч + открытие),
+    # первый уже забирал файл и удалял токен — второй получал "Link expired". Оставляем до истечения TTL.
     path = Path(file_path)
     if not path.exists():
         return HttpResponse('File not found', status=404)
