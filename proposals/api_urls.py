@@ -7,6 +7,7 @@ from . import api_views
 app_name = 'proposals_api'
 
 urlpatterns = [
+    path('telegram-process/', api_views.telegram_process_view),
     path('tkp/reference/', api_views.tkp_reference_view),
     path('tkp/draft/', api_views.tkp_draft_create_view),
     path('tkp/draft/<int:draft_id>/set-field/', api_views.tkp_draft_set_field_view),

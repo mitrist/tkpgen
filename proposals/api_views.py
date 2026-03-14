@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from .telegram_webhook import process_telegram_message
 from .tkp_draft_service import (
     build_proposal_data_from_draft,
     get_draft_state_for_prompt,
@@ -167,3 +168,39 @@ def tkp_draft_submit_final_view(request, draft_id):
     if err:
         return JsonResponse({'error': err}, status=400)
     return JsonResponse({'base_name': base_name, 'status': 'final'})
+
+
+@require_http_methods(['POST'])
+@csrf_exempt
+@_api_key_required
+def telegram_process_view(request):
+    """
+    POST api/telegram-process/ — внутренний endpoint для long polling бота.
+    Тело JSON: {"chat_id": int, "user_id": int, "text": str?} или {"chat_id", "user_id", "callback_data": str}.
+    Ответ: {"reply_text", "error", "inline_keyboard": [[{text, callback_data}]], "document_path": str?}.
+    """
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'reply_text': None, 'error': 'Invalid JSON', 'inline_keyboard': None, 'document_path': None}, status=400)
+    chat_id = body.get('chat_id')
+    user_id = body.get('user_id')
+    text = body.get('text')
+    callback_data = body.get('callback_data')
+    if chat_id is None or user_id is None:
+        return JsonResponse({'reply_text': None, 'error': 'chat_id and user_id required', 'inline_keyboard': None, 'document_path': None}, status=400)
+    if callback_data is not None:
+        callback_data = str(callback_data).strip() if callback_data else None
+    if text is None and callback_data is None:
+        text = ''
+    elif text is not None and not isinstance(text, str):
+        text = str(text)
+    reply_text, error, inline_keyboard, document_path = process_telegram_message(
+        chat_id, user_id, text=text or None, callback_data=callback_data,
+    )
+    return JsonResponse({
+        'reply_text': reply_text,
+        'error': error,
+        'inline_keyboard': inline_keyboard,
+        'document_path': document_path,
+    })

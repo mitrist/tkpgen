@@ -736,6 +736,101 @@ OPENCLAW_API_KEY=тот_же_токен_что_в_gateway.auth.token
 
 ---
 
+## ТКП Telegram: режим long polling
+
+Вебхук и long polling — **альтернативные** способы получения обновлений от Telegram для одного бота. При использовании режима long polling вебхук **не задавайте** или сбросьте его (вызов `setWebhook` с пустым `url`), иначе обновления могут уходить в вебхук, а не в getUpdates.
+
+**Когда выбирать вебхук:** есть публичный HTTPS для бота, нужна масштабируемость (несколько воркеров, балансировка).  
+**Когда выбирать polling:** нет HTTPS для приёма вебхука от Telegram, проще поднять один процесс без настройки Nginx/домена для бота.
+
+### Переменные окружения
+
+В `.env` (или в `EnvironmentFile` systemd для сервиса polling) задайте:
+
+| Переменная | Описание |
+|------------|----------|
+| `TELEGRAM_BOT_TOKEN` | Токен бота от BotFather |
+| `TELEGRAM_PROCESS_URL` | URL внутреннего endpoint обработки, например `http://127.0.0.1:8000/api/telegram-process/` |
+| `TKP_TELEGRAM_API_KEY` | Ключ для заголовка `X-API-Key` при вызове Django (тот же, что для API) |
+
+### Запуск скрипта
+
+Из каталога проекта с активированным venv:
+
+```bash
+cd /home/mitrist12/tkp_generator
+source venv/bin/activate
+python scripts/telegram_polling_bot.py
+```
+
+Либо напрямую через интерпретатор venv:
+
+```bash
+/home/mitrist12/tkp_generator/venv/bin/python /home/mitrist12/tkp_generator/scripts/telegram_polling_bot.py
+```
+
+### systemd: сервис tkp_telegram_polling
+
+Создайте unit-файл `/etc/systemd/system/tkp_telegram_polling.service`:
+
+```bash
+sudo nano /etc/systemd/system/tkp_telegram_polling.service
+```
+
+Содержимое:
+
+```ini
+[Unit]
+Description=TKP Telegram bot (long polling)
+After=network.target tkp_generator.service
+
+[Service]
+User=mitrist12
+Group=mitrist12
+WorkingDirectory=/home/mitrist12/tkp_generator
+
+EnvironmentFile=/home/mitrist12/tkp_generator/.env
+
+ExecStart=/home/mitrist12/tkp_generator/venv/bin/python /home/mitrist12/tkp_generator/scripts/telegram_polling_bot.py
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Включение и запуск:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable tkp_telegram_polling
+sudo systemctl start tkp_telegram_polling
+```
+
+Логи: `sudo journalctl -u tkp_telegram_polling -f`.
+
+### Сброс вебхука (если переходите с вебхука на polling)
+
+Чтобы Telegram перестал слать обновления на вебхук и скрипт polling мог получать их через getUpdates:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": ""}'
+```
+
+Подставьте свой токен вместо `<TELEGRAM_BOT_TOKEN>`.
+
+### Проверка
+
+1. Убедитесь, что Django и (при необходимости) сервис `tkp_telegram_polling` запущены.
+2. Отправьте боту в Telegram любое сообщение (например «Привет» или `/start`).
+3. Бот должен ответить (приветствием или следующим вопросом по ТКП).
+
+Если ответа нет — проверьте логи: `sudo journalctl -u tkp_telegram_polling -n 50` и `sudo journalctl -u tkp_generator -n 50`.
+
+---
+
 ## Полезные команды
 
 | Действие | Команда |
