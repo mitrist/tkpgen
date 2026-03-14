@@ -106,8 +106,12 @@
     .download-block .download-message { margin: 1rem 0 0.75rem; color: var(--text); font-size: 0.9375rem; }
     .download-buttons { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
     .btn-download {
-      display: inline-block;
       padding: 0.6rem 1.25rem;
+      min-height: 44px;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       background: var(--primary);
       color: #fff;
       border-radius: 6px;
@@ -117,6 +121,21 @@
     }
     .btn-download:hover { background: var(--primary-hover); color: #fff; }
     .btn-download.hidden { display: none; }
+    .download-block .download-link-row { margin-top: 1rem; font-size: 0.9375rem; color: var(--text-muted); }
+    .download-block .download-link-row a {
+      color: var(--primary);
+      text-decoration: none;
+      word-break: break-all;
+      padding: 0.35rem 0;
+      display: inline-block;
+      min-height: 44px;
+      line-height: 1.4;
+    }
+    .download-block .download-link-row a:hover { text-decoration: underline; }
+    @media (max-width: 480px) {
+      .btn-download { min-height: 48px; padding: 0.75rem 1.5rem; font-size: 1.0625rem; width: 100%; }
+      .download-buttons { flex-direction: column; }
+    }
   </style>
 </head>
 <body>
@@ -191,6 +210,7 @@
             <a id="btnDownloadPdf" href="#" class="btn-download" target="_blank" rel="noopener">Скачать PDF</a>
             <a id="btnDownloadDocx" href="#" class="btn-download" target="_blank" rel="noopener">Скачать DOCX</a>
           </div>
+          <p id="download-pdf-link-row" class="download-link-row hidden">Ссылка на PDF: <a id="linkDownloadPdf" href="#" target="_blank" rel="noopener">открыть</a></p>
         </div>
       </form>
     </div>
@@ -432,11 +452,20 @@
             var block = document.getElementById('download-block');
             var btnPdf = document.getElementById('btnDownloadPdf');
             var btnDocx = document.getElementById('btnDownloadDocx');
+            var pdfUrl = data.download_url_pdf ? baseUrl + data.download_url_pdf : '';
+            var linkPdfRow = document.getElementById('download-pdf-link-row');
+            var linkPdf = document.getElementById('linkDownloadPdf');
             if (data.download_url_pdf) {
-              btnPdf.href = baseUrl + data.download_url_pdf;
+              btnPdf.href = pdfUrl;
               btnPdf.classList.remove('hidden');
+              if (linkPdfRow && linkPdf) {
+                linkPdf.href = pdfUrl;
+                linkPdf.textContent = 'Скачать PDF';
+                linkPdfRow.classList.remove('hidden');
+              }
             } else {
               btnPdf.classList.add('hidden');
+              if (linkPdfRow) linkPdfRow.classList.add('hidden');
             }
             if (data.download_url_docx) {
               btnDocx.href = baseUrl + data.download_url_docx;
@@ -447,17 +476,24 @@
             block.classList.remove('hidden');
             block.querySelector('.download-message').textContent = 'Скачайте файл в нужном формате:';
             updateMainButton();
+            function openDownloadLink(e, url) {
+              if (!url || url === '#') return;
+              haptic('selection');
+              if (tg && tg.openLink) {
+                e.preventDefault();
+                tg.openLink(url);
+              }
+            }
             [btnPdf, btnDocx].forEach(function(btn) {
               btn.onclick = function(e) {
                 if (btn.href && btn.href !== '#' && !btn.classList.contains('hidden')) {
-                  haptic('selection');
-                  if (tg && tg.openLink) {
-                    e.preventDefault();
-                    tg.openLink(btn.href);
-                  }
+                  openDownloadLink(e, btn.href);
                 }
               };
             });
+            if (linkPdf && pdfUrl) {
+              linkPdf.onclick = function(e) { openDownloadLink(e, pdfUrl); };
+            }
           })
           .catch(function(err) {
             setStatus(err.message || 'Ошибка отправки', true);
