@@ -96,26 +96,74 @@ python manage.py createsuperuser
 
 ## 5. Конфигурация для production
 
-Создайте файл переменных окружения (скопируйте пример и отредактируйте):
+### Создание .env на сервере
 
-```bash
-cp /home/mitrist12/tkp_generator/.env.example /home/mitrist12/tkp_generator/.env
-nano /home/mitrist12/tkp_generator/.env
-```
+1. Подключитесь по SSH и перейдите в каталог проекта:
+   ```bash
+   cd /home/mitrist12/tkp_generator
+   ```
 
-Содержимое `.env`:
-```
-SECRET_KEY=сгенерируйте-длинную-случайную-строку
-DEBUG=False
-ALLOWED_HOSTS=93.77.182.91,localhost,127.0.0.1
-```
+2. Создайте `.env` из примера (или пустой файл, если примера нет):
+   ```bash
+   cp .env.example .env
+   ```
+   Если файла `.env.example` нет:
+   ```bash
+   touch .env
+   ```
 
-Для `SECRET_KEY` сгенерируйте строку:
-```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(50))"
-```
+3. Откройте файл для редактирования:
+   ```bash
+   nano .env
+   ```
 
-Settings уже читают переменные из окружения. Убедитесь, что `EnvironmentFile` в systemd указывает на `.env`.
+4. Заполните переменные (по одной на строку, без пробелов вокруг `=`):
+   ```env
+   SECRET_KEY=сгенерируйте-длинную-случайную-строку
+   DEBUG=False
+   ALLOWED_HOSTS=93.77.182.91,localhost,127.0.0.1,nacpro-web-service.ru,www.nacpro-web-service.ru
+   ```
+   Для генерации `SECRET_KEY` на сервере выполните:
+   ```bash
+   python3 -c "import secrets; print(secrets.token_urlsafe(50))"
+   ```
+   Скопируйте вывод в значение `SECRET_KEY=`.
+
+5. Если используется ТКП через Telegram, добавьте в тот же `.env`:
+   ```env
+   TELEGRAM_BOT_TOKEN=токен_от_BotFather
+   TELEGRAM_WEBHOOK_SECRET=ваша_случайная_строка_секрета
+   OPENCLAW_GATEWAY_URL=https://ваш-openclaw:порт
+   OPENCLAW_API_KEY=ключ_OpenClaw
+   TKP_TELEGRAM_API_KEY=ключ_для_api_при_нужности
+   TKP_TELEGRAM_BOT_USER_ID=
+   ```
+   Необязательные переменные можно не указывать или оставить пустыми.
+
+6. Сохраните файл в nano: `Ctrl+O`, Enter, затем выход: `Ctrl+X`.
+
+7. Ограничьте доступ к `.env` (только владелец может читать):
+   ```bash
+   chmod 600 .env
+   ```
+   Если приложение запускается от другого пользователя (например, через systemd от `mitrist12`), владельцем должен быть этот пользователь:
+   ```bash
+   sudo chmod 600 /home/mitrist12/tkp_generator/.env
+   ```
+
+8. Убедитесь, что в unit-файле systemd указан путь к `.env`:
+   ```bash
+   sudo grep EnvironmentFile /etc/systemd/system/tkp_generator.service
+   ```
+   Должна быть строка: `EnvironmentFile=/home/mitrist12/tkp_generator/.env`.
+
+9. После изменения `.env` перезапустите приложение:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl restart tkp_generator
+   ```
+
+Приложение читает переменные из окружения (Django не использует python-dotenv); systemd подставляет их из `EnvironmentFile` при старте сервиса.
 
 ---
 
@@ -507,10 +555,176 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 
 Если используете `TELEGRAM_WEBHOOK_SECRET`, добавьте его в URL: `https://ваш-домен/telegram/webhook/?secret=ваш_секрет`.
 
-### 3. OpenClaw
+### 3. OpenClaw: URL шлюза и API-ключ
 
-- На VM должен быть доступен эндпоинт OpenClaw `POST /v1/responses` (в конфиге OpenClaw: `gateway.http.endpoints.responses.enabled: true`).
-- Модель DeepSeek подключается в конфигурации OpenClaw отдельно.
+Ошибка «OpenClaw not configured (OPENCLAW_GATEWAY_URL, OPENCLAW_API_KEY)» означает, что в `.env` приложения не заданы или пустые переменные `OPENCLAW_GATEWAY_URL` и `OPENCLAW_API_KEY`. Их нужно взять из настройки **шлюза OpenClaw** на той же VM (или другом сервере), где запущен OpenClaw Gateway.
+
+#### 3.1. Где лежит конфиг OpenClaw
+
+Обычно конфиг: `~/.openclaw/openclaw.json` (на сервере под пользователем, от которого запущен OpenClaw). Полный путь может быть, например: `/home/mitrist12/.openclaw/openclaw.json`.
+
+#### 3.2. Включить эндпоинт /v1/responses
+
+В конфиге должен быть включён HTTP-эндпоинт для API ответов:
+
+```json
+{
+  "gateway": {
+    "http": {
+      "endpoints": {
+        "responses": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}
+```
+
+Если секции `gateway.http` или `gateway.http.endpoints.responses` нет — добавьте их и установите `responses.enabled: true`.
+
+#### 3.3. Задать токен доступа к шлюзу (это и есть OPENCLAW_API_KEY)
+
+Клиенты вызывают API шлюза с заголовком `Authorization: Bearer <токен>`. Этот токен задаётся в конфиге OpenClaw в блоке `gateway.auth`:
+
+**Вариант A — задать токен вручную**
+
+1. Придумайте длинную случайную строку (например сгенерируйте: `openssl rand -hex 32`).
+2. В `~/.openclaw/openclaw.json` добавьте или измените секцию `gateway.auth`:
+
+```json
+{
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "ваша_случайная_строка_токена"
+    }
+  }
+}
+```
+
+Вместо строки можно использовать переменную окружения, например: `"token": "${OPENCLAW_GATEWAY_TOKEN}"`, и задать `OPENCLAW_GATEWAY_TOKEN` в окружении процесса OpenClaw (systemd, .env и т.п.).
+
+3. **Этот же токен** скопируйте в `.env` приложения ТКП как значение `OPENCLAW_API_KEY`:
+
+```env
+OPENCLAW_API_KEY=ваша_случайная_строка_токена
+```
+
+**Вариант B — токен при первой настройке (onboarding)**
+
+Если OpenClaw при первой настройке запускали через `openclaw onboard` или мастер настройки, он мог сгенерировать токен и записать его в конфиг. Тогда:
+
+1. Откройте `~/.openclaw/openclaw.json` и найдите `gateway.auth.token` (или `gateway.auth.password` при режиме password).
+2. Скопируйте это значение в `.env` приложения в переменную `OPENCLAW_API_KEY`.
+
+Если в конфиге указано `"token": "${OPENCLAW_GATEWAY_TOKEN}"`, то значение берётся из переменной окружения на хосте OpenClaw — задайте такой же токен в `.env` приложения ТКП для `OPENCLAW_API_KEY`.
+
+#### 3.4. URL шлюза (OPENCLAW_GATEWAY_URL)
+
+- Если OpenClaw и приложение ТКП на **одной VM**, шлюз по умолчанию слушает порт **18789** на loopback. Укажите в `.env`:
+  ```env
+  OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
+  ```
+- Если OpenClaw на **другом сервере**, укажите полный URL до шлюза (с протоколом и портом), например:
+  ```env
+  OPENCLAW_GATEWAY_URL=http://192.168.1.10:18789
+  ```
+  или
+  ```env
+  OPENCLAW_GATEWAY_URL=https://openclaw.ваш-домен.ru
+  ```
+  (если перед шлюзом стоит Nginx/прокси с TLS).
+
+Проверка с сервера приложения: `curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ВАШ_ТОКЕН" http://127.0.0.1:18789/v1/responses` — без тела может вернуть 400, но не 401 (401 = неверный или отсутствующий токен).
+
+#### 3.5. Итог в .env приложения
+
+В итоге в `.env` должны быть непустые строки:
+
+```env
+OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
+OPENCLAW_API_KEY=тот_же_токен_что_в_gateway.auth.token
+```
+
+После изменения `.env` перезапустите приложение: `sudo systemctl restart tkp_generator`.
+
+Модель DeepSeek подключается в конфигурации OpenClaw отдельно (провайдер и ключ для DeepSeek в OpenClaw).
+
+#### 3.6. Как поправить на сервере (ошибки 401, 400)
+
+Если бот в Telegram отвечает ошибкой или в логах видно «401 Unauthorized» или «400 Bad Request» при вызове OpenClaw, выполните по шагам на сервере.
+
+**1. Конфиг OpenClaw**
+
+- Подключитесь по SSH к VM, где запущен OpenClaw.
+- Откройте конфиг (часто `~/.openclaw/openclaw.json` или `~/.openclaw/conf.json` у пользователя, под которым крутится OpenClaw):
+
+  ```bash
+  nano ~/.openclaw/openclaw.json
+  ```
+
+- Убедитесь, что в блоке `gateway` есть:
+  - **Токен:** `gateway.auth.mode` = `"token"` и `gateway.auth.token` = строка (например сгенерируйте: `openssl rand -hex 24`).
+  - **Эндпоинт /v1/responses:** внутри `gateway` на одном уровне с `auth` должен быть блок `http`:
+
+  ```json
+  "gateway": {
+    "port": 18789,
+    "auth": {
+      "mode": "token",
+      "token": "ВАШ_ТОКЕН_СЮДА"
+    },
+    "http": {
+      "endpoints": {
+        "responses": {
+          "enabled": true
+        }
+      }
+    }
+  }
+  ```
+
+  Сохраните файл (в nano: Ctrl+O, Enter, Ctrl+X). Перезапустите OpenClaw (например `sudo systemctl restart openclaw` или как у вас настроен сервис).
+
+**2. Переменные окружения приложения ТКП**
+
+- На той же VM откройте `.env` приложения (путь из systemd, обычно `/home/mitrist12/tkp_generator/.env`):
+
+  ```bash
+  sudo nano /home/mitrist12/tkp_generator/.env
+  ```
+
+- Задайте (или исправьте) две переменные — **значения должны совпадать с конфигом OpenClaw**:
+  - `OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789` — для одной VM используйте **http** (не https), если шлюз без TLS.
+  - `OPENCLAW_API_KEY=` **тот же токен**, что в `gateway.auth.token` в конфиге OpenClaw (см. шаг 1).
+
+- Сохраните файл.
+
+**3. Код приложения**
+
+- Убедитесь, что на сервере подтянут актуальный код (в запрос к `/v1/responses` добавлено поле `model: "openclaw"` и улучшена обработка ошибок):
+
+  ```bash
+  cd /home/mitrist12/tkp_generator
+  git fetch origin
+  git pull origin main
+  ./deploy.sh
+  ```
+
+  Если не используете Git с этого сервера — скопируйте обновлённый `proposals/telegram_webhook.py` (в нём в `payload` и `payload2` должно быть `'model': 'openclaw'`).
+
+**4. Перезапуск**
+
+- Перезапустите приложение ТКП, чтобы подхватить новый `.env`:
+
+  ```bash
+  sudo systemctl restart tkp_generator
+  ```
+
+- При необходимости перезапустите OpenClaw (если меняли его конфиг).
+
+**Проверка:** отправьте боту сообщение в Telegram. В логах приложения не должно быть 401/400: `sudo journalctl -u tkp_generator -n 30`. Если 400 остаётся — в логе теперь будет тело ответа от OpenClaw (поле `error.message`), по нему можно уточнить причину.
 
 ### 4. Проверка
 

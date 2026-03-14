@@ -30,3 +30,6 @@ Thumbs.db
 # Env
 .env
 .env.local
+
+# OpenClaw config (содержит токены и ключи — не коммитить)
+conf.json

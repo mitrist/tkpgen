@@ -182,6 +182,7 @@ def _call_openclaw(user_id, instructions, input_messages, tools, draft_id):
         })
 
     payload = {
+        'model': 'openclaw',
         'user': str(user_id),
         'instructions': instructions,
         'input': input_items,
@@ -197,6 +198,15 @@ def _call_openclaw(user_id, instructions, input_messages, tools, draft_id):
         r = httpx.post(url, json=payload, headers=headers, timeout=60.0)
         r.raise_for_status()
         data = r.json()
+    except httpx.HTTPStatusError as e:
+        body = e.response.text
+        try:
+            err_obj = e.response.json()
+            msg = err_obj.get('error', {}).get('message', body) or body
+        except Exception:
+            msg = body or str(e)
+        logger.exception('OpenClaw request failed %s: %s', e.response.status_code, msg)
+        return None, f'{e.response.status_code}: {msg}'
     except Exception as e:
         logger.exception('OpenClaw request failed: %s', e)
         return None, str(e)
@@ -238,6 +248,7 @@ def _call_openclaw(user_id, instructions, input_messages, tools, draft_id):
             else:
                 new_items.append({'type': 'message', 'role': m.get('role', 'user'), 'content': m.get('content', '')})
         payload2 = {
+            'model': 'openclaw',
             'user': str(user_id),
             'instructions': instructions,
             'input': new_items,
