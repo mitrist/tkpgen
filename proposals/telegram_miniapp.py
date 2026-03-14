@@ -31,22 +31,27 @@ DOWNLOAD_TOKEN_TTL = 600  # 10 минут
 def validate_init_data(init_data_str):
     """
     Проверка подписи initData от Telegram Mini App.
+    По документации: secret_key = HMAC_SHA256(key="WebAppData", message=bot_token).
     Возвращает dict с полями (user, auth_date, ...) или None при неверной подписи.
     """
     if not init_data_str or not isinstance(init_data_str, str):
+        logger.warning('initData: empty or not string')
         return None
     token = (getattr(settings, 'TELEGRAM_BOT_TOKEN', None) or '').strip()
     if not token:
+        logger.warning('initData: TELEGRAM_BOT_TOKEN not set')
         return None
     try:
         params = dict(parse_qsl(init_data_str, keep_blank_values=True))
         received_hash = params.pop('hash', None)
         if not received_hash:
+            logger.warning('initData: hash missing in params')
             return None
         data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(params.items()))
+        # Ключ — строка "WebAppData", сообщение — токен бота (см. core.telegram.org/bots/webapps)
         secret_key = hmac.new(
-            token.encode(),
             b'WebAppData',
+            token.encode(),
             hashlib.sha256,
         ).digest()
         computed_hash = hmac.new(
@@ -55,6 +60,7 @@ def validate_init_data(init_data_str):
             hashlib.sha256,
         ).hexdigest()
         if computed_hash != received_hash:
+            logger.warning('initData: hash mismatch (wrong token or data)')
             return None
         # Парсим user из JSON если есть
         if 'user' in params:
@@ -64,7 +70,7 @@ def validate_init_data(init_data_str):
                 pass
         return params
     except Exception as e:
-        logger.debug('initData validation failed: %s', e)
+        logger.warning('initData validation failed: %s', e)
         return None
 
 
