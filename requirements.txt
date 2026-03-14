@@ -6,4 +6,5 @@ gunicorn>=21.0
 pypdf>=4.0.0
 mammoth>=1.6
 pypandoc-binary>=1.11
+httpx>=0.25
 

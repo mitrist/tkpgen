@@ -1,4 +1,5 @@
 from django import forms
+from .choices import INTERNAL_CLIENT_CHOICES, SROK_CHOICES
 from .models import Counterparty, Region, Service
 
 
@@ -27,13 +28,7 @@ class ProposalForm(forms.Form):
     )
     internal_client = forms.ChoiceField(
         label='Внутренний клиент',
-        choices=[
-            ('', 'Выберите клиента'),
-            ('ООО НацПро', 'ООО НацПро'),
-            ('ООО Нацпро Северо-Запад', 'ООО Нацпро Северо-Запад'),
-            ('ИП Соколова АМ', 'ИП Соколова АМ'),
-            ('ООО Северная Столица', 'ООО Северная Столица'),
-        ],
+        choices=INTERNAL_CLIENT_CHOICES,
         required=False
     )
     internal_price = forms.DecimalField(
@@ -56,13 +51,7 @@ class ProposalForm(forms.Form):
     )
     srok = forms.ChoiceField(
         label='Срок разработки',
-        choices=[
-            ('', 'Выберите срок'),
-            ('в течение 10 рабочих дней', 'в течение 10 рабочих дней'),
-            ('в течение 15 рабочих дней', 'в течение 15 рабочих дней'),
-            ('в течение 20 рабочих дней', 'в течение 20 рабочих дней'),
-            ('в течение 35 рабочих дней', 'в течение 35 рабочих дней'),
-        ],
+        choices=SROK_CHOICES,
         required=False
     )
     text = forms.CharField(
@@ -96,15 +85,6 @@ class ProposalForm(forms.Form):
             if data.get('s') is None or data.get('s', 0) < 0:
                 self.add_error('s', 'Введите значение для расчёта стоимости')
         return data
-
-
-SROK_CHOICES = [
-    ('', 'Выберите срок'),
-    ('в течение 10 рабочих дней', 'в течение 10 рабочих дней'),
-    ('в течение 15 рабочих дней', 'в течение 15 рабочих дней'),
-    ('в течение 20 рабочих дней', 'в течение 20 рабочих дней'),
-    ('в течение 35 рабочих дней', 'в течение 35 рабочих дней'),
-]
 
 
 class ComplexProposalForm(forms.Form):

@@ -1,9 +1,11 @@
 from django.urls import path
 from . import views
+from .telegram_webhook import telegram_webhook_view
 
 app_name = 'proposals'
 
 urlpatterns = [
+    path('telegram/webhook/', telegram_webhook_view),
     path('table/', views.table_view, name='table'),
     path('kanban/', views.kanban_view, name='kanban'),
     path('kanban/card/<int:tkp_id>/', views.kanban_card_detail_view, name='kanban_card_detail'),

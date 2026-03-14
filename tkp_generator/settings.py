@@ -109,3 +109,14 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = '...'
 EMAIL_HOST_PASSWORD = '...'
 DEFAULT_FROM_EMAIL = 'mitrist12@yandex.com'
+
+# API для Telegram/OpenClaw: ключ в заголовке X-API-Key или Authorization: Bearer
+TKP_TELEGRAM_API_KEY = _env('TKP_TELEGRAM_API_KEY', '')
+# Опционально: id пользователя Django для created_by при создании ТКП из бота
+TKP_TELEGRAM_BOT_USER_ID = _env('TKP_TELEGRAM_BOT_USER_ID', '') or None
+
+# Telegram бот и OpenClaw для моста ТКП
+TELEGRAM_BOT_TOKEN = _env('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_WEBHOOK_SECRET = _env('TELEGRAM_WEBHOOK_SECRET', '') or None
+OPENCLAW_GATEWAY_URL = _env('OPENCLAW_GATEWAY_URL', '')
+OPENCLAW_API_KEY = _env('OPENCLAW_API_KEY', '')

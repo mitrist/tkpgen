@@ -120,6 +120,53 @@ class TKPRecord(models.Model):
         return f'{self.number} — {self.client}'
 
 
+class TkpTelegramDraft(models.Model):
+    """Черновик ТКП по сессии Telegram (состояние диалога для OpenClaw)."""
+    telegram_user_id = models.CharField('Telegram user id', max_length=64, db_index=True)
+    telegram_chat_id = models.CharField('Telegram chat id', max_length=64)
+    is_internal = models.BooleanField('Внутренний заказчик', default=False, blank=True)
+    date = models.DateField('Дата ТКП', null=True, blank=True)
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Услуга',
+        related_name='+',
+    )
+    region = models.ForeignKey(
+        Region,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Регион',
+        related_name='+',
+    )
+    internal_client = models.CharField('Внутренний клиент', max_length=255, blank=True)
+    internal_price = models.DecimalField(
+        'Стоимость для внутреннего заказчика',
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    client = models.CharField('Наименование клиента', max_length=255, blank=True)
+    room = models.TextField('Параметры объекта / помещение', blank=True)
+    s = models.CharField('Площадь / количество', max_length=100, blank=True)
+    srok = models.CharField('Срок разработки', max_length=255, blank=True)
+    text = models.TextField('Произвольный текст', blank=True)
+    payload = models.JSONField('Сырые значения', default=dict, blank=True)
+    updated_at = models.DateTimeField('Обновлено', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Черновик ТКП (Telegram)'
+        verbose_name_plural = 'Черновики ТКП (Telegram)'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'Draft {self.telegram_user_id}'
+
+
 class Counterparty(models.Model):
     """Контрагент: реквизиты из карточки «Добавление реквизитов»."""
     name = models.CharField('Наименование', max_length=500, blank=True)
