@@ -184,18 +184,19 @@ def miniapp_submit_view(request):
         return JsonResponse({'error': err}, status=400)
     out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', Path(settings.BASE_DIR) / 'TKP_output'))
     pdf_path = out_dir / f'{base_name}.pdf'
-    if not pdf_path.exists():
-        docx_path = out_dir / f'{base_name}.docx'
-        file_path = docx_path if docx_path.exists() else None
-    else:
-        file_path = pdf_path
-    if not file_path or not file_path.exists():
-        return JsonResponse({'error': 'Файл не найден после генерации'}, status=500)
-    token = DOWNLOAD_TOKEN_PREFIX + secrets.token_urlsafe(24)
-    cache.set(token, str(file_path), timeout=DOWNLOAD_TOKEN_TTL)
-    # URL для скачивания (относительный путь; фронт подставит свой origin при необходимости)
-    download_url = f'/tkp-app/download/{token}/'
-    return JsonResponse({'download_url': download_url, 'base_name': base_name})
+    docx_path = out_dir / f'{base_name}.docx'
+    result = {'base_name': base_name, 'download_url_pdf': None, 'download_url_docx': None}
+    if pdf_path.exists():
+        token_pdf = DOWNLOAD_TOKEN_PREFIX + secrets.token_urlsafe(24)
+        cache.set(token_pdf, str(pdf_path), timeout=DOWNLOAD_TOKEN_TTL)
+        result['download_url_pdf'] = f'/tkp-app/download/{token_pdf}/'
+    if docx_path.exists():
+        token_docx = DOWNLOAD_TOKEN_PREFIX + secrets.token_urlsafe(24)
+        cache.set(token_docx, str(docx_path), timeout=DOWNLOAD_TOKEN_TTL)
+        result['download_url_docx'] = f'/tkp-app/download/{token_docx}/'
+    if not result['download_url_pdf'] and not result['download_url_docx']:
+        return JsonResponse({'error': 'Файлы не найдены после генерации'}, status=500)
+    return JsonResponse(result)
 
 
 @require_http_methods(['GET'])
