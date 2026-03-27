@@ -148,11 +148,13 @@ python manage.py createsuperuser
    MAX_MINIAPP_BASE_URL=https://nacpro-web-service.ru
    MAX_API_BASE_URL=https://platform-api.max.ru
    MAX_INITDATA_TTL_SECONDS=86400
+   MAX_ALLOW_INSECURE_INITDATA=False
    ```
    Где:
    - `MAX_MINIAPP_BASE_URL` — публичный HTTPS URL вашего сервиса;
    - mini app будет доступен по `https://<домен>/max-app/`;
    - webhook endpoint: `https://<домен>/max/webhook/?secret=<MAX_WEBHOOK_SECRET>`.
+   - `MAX_ALLOW_INSECURE_INITDATA=True` — временно разрешает запуск mini app без валидного initData (только для диагностики, на проде держать `False`).
 
 6. Сохраните файл в nano: `Ctrl+O`, Enter, затем выход: `Ctrl+X`.
 

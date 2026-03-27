@@ -56,7 +56,19 @@ export default function App() {
   const [tkpList, setTkpList] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [single, setSingle] = useState({ date: "", service_id: "", client: "", region_id: "", s: "", srok: "", room: "", text: "" });
+  const [single, setSingle] = useState({
+    date: "",
+    service_id: "",
+    region_id: "",
+    is_internal: false,
+    internal_client: "",
+    internal_price: "",
+    client: "",
+    s: "",
+    srok: "",
+    room: "",
+    text: "",
+  });
   const [complex, setComplex] = useState({ date: "", client: "", region_name: "", room: "", srok: "", text1: "", rows: [] });
   const [req, setReq] = useState({ name: "", inn: "", kpp: "", address: "", director: "", ogrn: "", account: "", bank: "", bik: "", kor_account: "", phone: "", email: "" });
   const [contract, setContract] = useState({ tkp_id: "", counterparty: "", date: "", price: "", payment_terms: "", include_ris: true, customer_name: "" });
@@ -87,6 +99,12 @@ export default function App() {
   const services = useMemo(() => reference?.services || [], [reference]);
   const regions = useMemo(() => reference?.regions || [], [reference]);
   const srokChoices = useMemo(() => reference?.srok_choices || [], [reference]);
+  const internalClients = useMemo(() => reference?.internal_clients || [], [reference]);
+  const selectedService = useMemo(
+    () => services.find((s) => String(s.id) === String(single.service_id)) || null,
+    [services, single.service_id]
+  );
+  const areaLabel = selectedService?.unit_type === "piece" ? "Количество (шт)" : "Площадь (м²)";
 
   function updateRow(idx, key, value) {
     const rows = [...complex.rows];
@@ -176,29 +194,90 @@ export default function App() {
 
         {tab === "single" && (
           <>
+            <label>Дата ТКП</label>
             <input type="date" value={single.date} onChange={(e) => setSingle({ ...single, date: e.target.value })} />
+
+            <label>Услуга</label>
             <select value={single.service_id} onChange={(e) => setSingle({ ...single, service_id: e.target.value })}>
               <option value="">Выберите услугу</option>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <input placeholder="Клиент" value={single.client} onChange={(e) => setSingle({ ...single, client: e.target.value })} />
-            <select value={single.region_id} onChange={(e) => setSingle({ ...single, region_id: e.target.value })}>
-              <option value="">Выберите регион</option>
-              {regions.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
+
+            <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "2px 0 8px" }}>
+              <input
+                type="checkbox"
+                checked={Boolean(single.is_internal)}
+                onChange={(e) =>
+                  setSingle((prev) => ({
+                    ...prev,
+                    is_internal: e.target.checked,
+                    region_id: e.target.checked ? "" : prev.region_id,
+                    client: e.target.checked ? "" : prev.client,
+                    s: e.target.checked ? "" : prev.s,
+                    internal_client: e.target.checked ? prev.internal_client : "",
+                    internal_price: e.target.checked ? prev.internal_price : "",
+                  }))
+                }
+                style={{ width: "auto", margin: 0 }}
+              />
+              Является внутренним заказчиком?
+            </label>
+
+            {single.is_internal ? (
+              <>
+                <label>Внутренний клиент</label>
+                <select value={single.internal_client} onChange={(e) => setSingle({ ...single, internal_client: e.target.value })}>
+                  <option value="">Выберите внутреннего клиента</option>
+                  {internalClients.map((c) => {
+                    const val = c.value || c.label || c;
+                    const label = c.label || c.value || c;
+                    return <option key={val} value={val}>{label}</option>;
+                  })}
+                </select>
+
+                <label>Стоимость для внутреннего заказчика</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={single.internal_price}
+                  onChange={(e) => setSingle({ ...single, internal_price: e.target.value })}
+                />
+              </>
+            ) : (
+              <>
+                <label>Регион</label>
+                <select value={single.region_id} onChange={(e) => setSingle({ ...single, region_id: e.target.value })}>
+                  <option value="">Выберите регион</option>
+                  {regions.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+
+                <label>Наименование клиента</label>
+                <input placeholder="Наименование клиента" value={single.client} onChange={(e) => setSingle({ ...single, client: e.target.value })} />
+              </>
+            )}
+
+            <label>{areaLabel}</label>
+            <input type="number" step="0.01" min="0" placeholder={areaLabel} value={single.s} onChange={(e) => setSingle({ ...single, s: e.target.value })} />
+
+            <label>Срок разработки</label>
             <select value={single.srok} onChange={(e) => setSingle({ ...single, srok: e.target.value })}>
               <option value="">Срок разработки</option>
               {srokChoices.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
-            <input placeholder="Площадь/кол-во" value={single.s} onChange={(e) => setSingle({ ...single, s: e.target.value })} />
-            <input placeholder="Помещение" value={single.room} onChange={(e) => setSingle({ ...single, room: e.target.value })} />
-            <Textarea placeholder="Комментарий" rows={3} value={single.text} onChange={(e) => setSingle({ ...single, text: e.target.value })} />
+
+            <label>Наименование объекта и характеристика помещений</label>
+            <input placeholder="Параметры объекта / помещение" value={single.room} onChange={(e) => setSingle({ ...single, room: e.target.value })} />
+
+            <label>Произвольный текст</label>
+            <Textarea placeholder="Произвольный текст" rows={4} value={single.text} onChange={(e) => setSingle({ ...single, text: e.target.value })} />
             <Button onClick={handleSingle}>Сформировать ТКП</Button>
           </>
         )}

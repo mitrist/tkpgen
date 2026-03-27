@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
 import tempfile
@@ -53,6 +54,8 @@ from .views import (
     _save_complex_tkp_record,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _json_body(request):
     try:
@@ -100,7 +103,30 @@ def max_auth_validate_view(request):
     init_data = body.get("initData") or ""
     validated = validate_max_init_data(init_data)
     if not validated:
-        return JsonResponse({"error": "Invalid initData"}, status=401)
+        if not getattr(settings, "MAX_ALLOW_INSECURE_INITDATA", False):
+            return JsonResponse({"error": "Invalid initData"}, status=401)
+        # Временный fallback для запуска mini app без валидного initData.
+        # Нужен только как временный обход в окружениях, где MAX client не передает initData.
+        logger.warning("MAX auth fallback: initData invalid, issuing insecure token")
+        app_token = issue_app_token(
+            user_id=1,
+            max_user_id="insecure",
+            chat_id="",
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "appToken": app_token,
+                "insecure": True,
+                "warning": "initData validation skipped",
+                "user": {
+                    "id": 1,
+                    "max_user_id": "insecure",
+                    "first_name": "",
+                    "last_name": "",
+                },
+            }
+        )
 
     ok, err = validate_ttl_and_replay(validated)
     if not ok:

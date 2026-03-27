@@ -17,7 +17,11 @@ if [ -f "frontend/max-app/package.json" ]; then
     (
       cd frontend/max-app
       npm install
-      npm run build
+      if command -v node >/dev/null 2>&1 && [ -f "node_modules/vite/bin/vite.js" ]; then
+        node node_modules/vite/bin/vite.js build
+      else
+        npm run build
+      fi
     )
   else
     echo "WARNING: npm не найден, пропускаю сборку frontend/max-app"

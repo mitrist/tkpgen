@@ -130,3 +130,6 @@ MAX_WEBHOOK_SECRET = _env('MAX_WEBHOOK_SECRET', '') or None
 MAX_MINIAPP_BASE_URL = (_env('MAX_MINIAPP_BASE_URL', '') or '').rstrip('/')
 MAX_API_BASE_URL = (_env('MAX_API_BASE_URL', 'https://platform-api.max.ru') or 'https://platform-api.max.ru').rstrip('/')
 MAX_INITDATA_TTL_SECONDS = int(_env('MAX_INITDATA_TTL_SECONDS', '86400'))
+# Временный режим: разрешить вход в mini app без валидного initData.
+# Использовать только для диагностики/временного обхода.
+MAX_ALLOW_INSECURE_INITDATA = _env('MAX_ALLOW_INSECURE_INITDATA', 'False').lower() in ('true', '1', 'yes')
