@@ -16,6 +16,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.clickjacking import xframe_options_exempt
 from docxtpl import DocxTemplate
 
 from .choices import INTERNAL_CLIENT_CHOICES, SROK_CHOICES
@@ -82,6 +83,7 @@ def _max_auth_required(view_func):
 
 
 @require_http_methods(["GET"])
+@xframe_options_exempt
 def max_app_view(request):
     """Страница mini app MAX (frontend shell)."""
     return render(request, "proposals/max_app.html", {})
