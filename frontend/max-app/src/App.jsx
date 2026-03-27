@@ -20,10 +20,17 @@ const tabs = [
   { id: "contract", label: "Договор" },
 ];
 
-function ResultBox({ data }) {
+function withToken(url, token) {
+  if (!url) return "";
+  if (!token) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}token=${encodeURIComponent(token)}`;
+}
+
+function ResultBox({ data, token }) {
   if (!data) return null;
-  const docx = data.download_docx || "";
-  const pdf = data.download_pdf || "";
+  const docx = withToken(data.download_docx || "", token);
+  const pdf = withToken(data.download_pdf || "", token);
   return (
     <div style={{ background: "#f3f4f6", borderRadius: 8, padding: 12, marginTop: 12 }}>
       {data.error ? <div style={{ color: "#b91c1c", marginBottom: 8 }}>{data.error}</div> : null}
@@ -389,7 +396,7 @@ export default function App() {
           </>
         )}
 
-        <ResultBox data={output} />
+        <ResultBox data={output} token={token} />
       </Container>
     </Panel>
   );

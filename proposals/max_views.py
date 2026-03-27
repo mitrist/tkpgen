@@ -70,6 +70,8 @@ def _auth_payload_from_request(request):
         auth = request.headers.get("Authorization", "")
         if auth.lower().startswith("bearer "):
             token = auth[7:].strip()
+    if not token:
+        token = (request.GET.get("token") or "").strip()
     payload = verify_app_token(token)
     return payload
 
