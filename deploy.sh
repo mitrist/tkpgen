@@ -11,6 +11,19 @@ PIP="${VENV}/bin/pip"
 echo "=== Установка зависимостей ==="
 "$PIP" install -r requirements.txt -q
 
+if [ -f "frontend/max-app/package.json" ]; then
+  echo "=== Сборка MAX mini app ==="
+  if command -v npm >/dev/null 2>&1; then
+    (
+      cd frontend/max-app
+      npm install
+      npm run build
+    )
+  else
+    echo "WARNING: npm не найден, пропускаю сборку frontend/max-app"
+  fi
+fi
+
 echo "=== Миграции ==="
 "$PY" manage.py migrate --noinput
 

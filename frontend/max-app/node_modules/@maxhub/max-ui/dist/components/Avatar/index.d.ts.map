@@ -1,0 +1,1 @@
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../../src/components/Avatar/index.ts"],"names":[],"mappings":"AAUA,QAAA,MAAM,eAAe;;;;;;;;CAQnB,CAAC;AAEH,OAAO,EAAE,eAAe,IAAI,MAAM,EAAE,CAAC;AACrC,YAAY,EAAE,sBAAsB,EAAE,yBAAyB,EAAE,mBAAmB,EAAE,oBAAoB,EAAE,mBAAmB,EAAE,eAAe,EAAE,gBAAgB,EAAE,oBAAoB,EAAE,kBAAkB,EAAE,kBAAkB,EAAE,eAAe,EAAE,MAAM,SAAS,CAAC"}

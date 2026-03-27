@@ -1,0 +1,1 @@
+{"version":3,"file":"Dot.d.ts","sourceRoot":"","sources":["../../../src/components/Dot/Dot.tsx"],"names":[],"mappings":"AACA,OAAO,EAAE,KAAK,cAAc,EAAc,MAAM,OAAO,CAAC;AAIxD,MAAM,MAAM,aAAa,GAAG,QAAQ,GAAG,iBAAiB,GAAG,cAAc,GAAG,YAAY,GAAG,SAAS,CAAC;AAErG,MAAM,WAAW,QAAS,SAAQ,cAAc,CAAC,MAAM,CAAC;IACtD,UAAU,CAAC,EAAE,aAAa,CAAA;CAC3B;AAED,eAAO,MAAM,GAAG,mHAgBd,CAAC"}

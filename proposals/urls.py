@@ -8,11 +8,25 @@ from .telegram_miniapp import (
     miniapp_submit_view,
     miniapp_download_view,
 )
+from .max_webhook import max_webhook_view
+from . import max_views
 
 app_name = 'proposals'
 
 urlpatterns = [
     path('telegram/webhook/', telegram_webhook_view),
+    path('max/webhook/', max_webhook_view),
+    path('max-app/', max_views.max_app_view, name='max_app'),
+    path('max/auth/validate/', max_views.max_auth_validate_view, name='max_auth_validate'),
+    path('max/api/reference/', max_views.max_reference_view, name='max_reference'),
+    path('max/api/tkp/single/submit/', max_views.max_submit_single_tkp_view, name='max_submit_single_tkp'),
+    path('max/api/tkp/complex/submit/', max_views.max_submit_complex_tkp_view, name='max_submit_complex_tkp'),
+    path('max/api/requisites/parse/', max_views.max_requisites_parse_view, name='max_requisites_parse'),
+    path('max/api/requisites/save/', max_views.max_requisites_save_view, name='max_requisites_save'),
+    path('max/api/counterparties/', max_views.max_counterparties_view, name='max_counterparties'),
+    path('max/api/counterparties/<int:pk>/', max_views.max_counterparty_detail_view, name='max_counterparty_detail'),
+    path('max/api/contract/submit/', max_views.max_contract_submit_view, name='max_contract_submit'),
+    path('max/api/download/<str:file_type>/', max_views.max_download_view, name='max_download'),
     path('tkp-app/', miniapp_menu_view),
     path('tkp-app/form/', miniapp_form_view),
     path('tkp-app/reference/', miniapp_reference_view),

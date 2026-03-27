@@ -1,0 +1,1 @@
+{"version":3,"file":"MaxUIContext.d.ts","sourceRoot":"","sources":["../../../src/components/MaxUI/MaxUIContext.tsx"],"names":[],"mappings":"AAEA,OAAO,EAAE,KAAK,eAAe,EAAE,KAAK,YAAY,EAAE,MAAM,aAAa,CAAC;AAEtE,MAAM,WAAW,qBAAqB;IACpC,QAAQ,EAAE,YAAY,CAAA;IACtB,WAAW,EAAE,eAAe,CAAA;CAC7B;AAED,eAAO,MAAM,YAAY,gDAGvB,CAAC;AAEH,eAAO,MAAM,aAAa,QAAO,qBAAiD,CAAC"}

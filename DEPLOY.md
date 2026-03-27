@@ -140,6 +140,20 @@ python manage.py createsuperuser
    ```
    Необязательные переменные можно не указывать или оставить пустыми.
 
+6. Если используется mini app в MAX, добавьте в `.env`:
+   ```env
+   MAX_ENABLED=True
+   MAX_BOT_TOKEN=токен_бота_MAX
+   MAX_WEBHOOK_SECRET=случайная_секретная_строка
+   MAX_MINIAPP_BASE_URL=https://nacpro-web-service.ru
+   MAX_API_BASE_URL=https://platform-api.max.ru
+   MAX_INITDATA_TTL_SECONDS=86400
+   ```
+   Где:
+   - `MAX_MINIAPP_BASE_URL` — публичный HTTPS URL вашего сервиса;
+   - mini app будет доступен по `https://<домен>/max-app/`;
+   - webhook endpoint: `https://<домен>/max/webhook/?secret=<MAX_WEBHOOK_SECRET>`.
+
 6. Сохраните файл в nano: `Ctrl+O`, Enter, затем выход: `Ctrl+X`.
 
 7. Ограничьте доступ к `.env` (только владелец может читать):
@@ -157,7 +171,7 @@ python manage.py createsuperuser
    ```
    Должна быть строка: `EnvironmentFile=/home/mitrist12/tkp_generator/.env`.
 
-9. После изменения `.env` перезапустите приложение:
+10. После изменения `.env` перезапустите приложение:
    ```bash
    sudo systemctl daemon-reload
    sudo systemctl restart tkp_generator
@@ -258,6 +272,73 @@ sudo systemctl reload nginx
 Имена должны совпадать с настройками в БД (см. `init_services`).
 
 В корне проекта должен быть `region_price.csv` — справочник цен по регионам. Он загружается командой `load_region_prices`.
+
+---
+
+## 8.1 Сборка MAX mini app (React + MAX UI)
+
+MAX mini app подключен как отдельная страница сервиса: `https://<домен>/max-app/`.
+Шаблон Django `max_app.html` подключает статические файлы сборки:
+- `/static/max-app/app.js`
+- `/static/max-app/app.css`
+
+Соберите фронтенд на сервере (или локально и перенесите артефакты):
+
+```bash
+cd /home/mitrist12/tkp_generator/frontend/max-app
+npm install
+npm run build
+```
+
+После сборки файлы будут записаны в:
+`/home/mitrist12/tkp_generator/proposals/static/max-app/`
+
+Затем обновите статику Django:
+
+```bash
+cd /home/mitrist12/tkp_generator
+source venv/bin/activate
+python manage.py collectstatic --noinput
+sudo systemctl restart tkp_generator
+sudo systemctl reload nginx
+```
+
+### Nginx для /max-app/ (точный рабочий блок)
+
+Специальный `location` для `/max-app/` не обязателен: страница отдается Django, а ассеты идут через `/static/`.
+Достаточно убедиться, что в конфиге есть:
+
+```nginx
+server {
+    listen 80;
+    server_name nacpro-web-service.ru www.nacpro-web-service.ru;
+
+    location /static/ {
+        alias /home/mitrist12/tkp_generator/staticfiles/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Проверка и перезагрузка:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Обновление через deploy.sh
+
+Скрипт `deploy.sh` теперь автоматически собирает `frontend/max-app` (если есть `npm`), затем выполняет миграции, `collectstatic` и рестарт сервиса.
 
 ---
 

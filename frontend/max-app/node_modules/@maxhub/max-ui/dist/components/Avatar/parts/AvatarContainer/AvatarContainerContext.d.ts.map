@@ -1,0 +1,1 @@
+{"version":3,"file":"AvatarContainerContext.d.ts","sourceRoot":"","sources":["../../../../../src/components/Avatar/parts/AvatarContainer/AvatarContainerContext.tsx"],"names":[],"mappings":"AAEA,OAAO,EAAE,KAAK,mBAAmB,EAAE,MAAM,mBAAmB,CAAC;AAE7D,MAAM,WAAW,+BAA+B;IAC9C,IAAI,EAAE,mBAAmB,CAAA;CAC1B;AAED,eAAO,MAAM,sBAAsB,0DAEjC,CAAC;AAEH,eAAO,MAAM,yBAAyB,QAAO,+BAAqE,CAAC"}

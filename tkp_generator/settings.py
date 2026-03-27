@@ -122,3 +122,11 @@ TELEGRAM_WEBHOOK_SECRET = _env('TELEGRAM_WEBHOOK_SECRET', '') or None
 TKP_MINIAPP_BASE_URL = (_env('TKP_MINIAPP_BASE_URL', '') or '').rstrip('/')
 OPENCLAW_GATEWAY_URL = _env('OPENCLAW_GATEWAY_URL', '')
 OPENCLAW_API_KEY = _env('OPENCLAW_API_KEY', '')
+
+# MAX bot + Mini App
+MAX_ENABLED = _env('MAX_ENABLED', 'False').lower() in ('true', '1', 'yes')
+MAX_BOT_TOKEN = _env('MAX_BOT_TOKEN', '')
+MAX_WEBHOOK_SECRET = _env('MAX_WEBHOOK_SECRET', '') or None
+MAX_MINIAPP_BASE_URL = (_env('MAX_MINIAPP_BASE_URL', '') or '').rstrip('/')
+MAX_API_BASE_URL = (_env('MAX_API_BASE_URL', 'https://platform-api.max.ru') or 'https://platform-api.max.ru').rstrip('/')
+MAX_INITDATA_TTL_SECONDS = int(_env('MAX_INITDATA_TTL_SECONDS', '86400'))
