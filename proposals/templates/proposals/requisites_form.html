@@ -28,6 +28,11 @@
 <div class="requisites-form-wrap">
 <h1>Добавление реквизитов</h1>
 <p class="requisites-intro" style="margin: 0 0 1.25rem; font-size: 0.9375rem; color: var(--text-muted, #6b7280);">Добавьте контрагента: введите реквизиты вручную в поля ниже или загрузите файл карточки (DOCX/PDF) для автоматического извлечения. Затем нажмите «Создать карточку» — контрагент появится в <a href="{% url 'proposals:counterparties' %}">справочнике Контрагенты</a>.</p>
+{% if from_contract and contract_form_url %}
+<p style="margin: 0 0 1rem;">
+    <a href="{% url 'proposals:counterparties' %}?return_url={{ contract_form_url|urlencode }}" class="btn">Выбрать контрагента из справочника</a>
+</p>
+{% endif %}
 
 <form method="post" action="{% url 'proposals:requisites_add' %}{% if from_contract and tkp_id %}?tkp_id={{ tkp_id }}&from=contract{% endif %}" enctype="multipart/form-data">
     {% csrf_token %}

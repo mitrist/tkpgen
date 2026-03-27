@@ -46,7 +46,7 @@
                     <input type="text" id="id_counterparty_display" value="{{ counterparty_display_name|default:'' }}" readonly placeholder="Выберите контрагента из справочника" style="flex: 1; margin-bottom: 0;">
                     <input type="hidden" name="counterparty" id="id_counterparty" value="{{ form.counterparty.value|default:'' }}">
                     <input type="hidden" name="customer_name" value="{{ counterparty_display_name|default:'' }}">
-                    <a href="{% url 'proposals:counterparties' %}?return_url={{ request.build_absolute_uri|urlencode }}" class="btn">Выбрать из справочника</a>
+                    <a href="{% url 'proposals:counterparties' %}?return_url={{ request.build_absolute_uri|urlencode }}" class="btn">Выбрать контрагента из справочника</a>
                 </div>
                 {% if form.counterparty.errors %}<ul class="errorlist">{{ form.counterparty.errors }}</ul>{% endif %}
             </div>
@@ -101,6 +101,13 @@
                 {{ form.payment_terms.label_tag }}
                 {{ form.payment_terms }}
                 {% if form.payment_terms.errors %}<ul class="errorlist">{{ form.payment_terms.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.75rem 1rem;">
+                    <label for="id_include_ris" style="margin: 0; font-weight: 700;">Включить пункт про РИС?</label>
+                    <div style="margin: 0; display: flex; align-items: center;">{{ form.include_ris }}</div>
+                </div>
+                {% if form.include_ris.errors %}<ul class="errorlist">{{ form.include_ris.errors }}</ul>{% endif %}
             </div>
         </div>
     </section>

@@ -35,6 +35,7 @@ urlpatterns = [
     path('contract/<int:contract_id>/download/<str:file_type>/', views.contract_download_file_view, name='contract_download'),
     path('tariffs/', views.tariffs_view, name='tariffs'),
     path('service-descriptions/', views.service_descriptions_view, name='service_descriptions'),
+    path('ris-text/', views.ris_text_view, name='ris_text'),
     path('requisites/', views.requisites_add_view, name='requisites_add'),
     path('counterparties/', views.counterparties_view, name='counterparties'),
     path('counterparties/search/', views.counterparty_search_view, name='counterparty_search'),

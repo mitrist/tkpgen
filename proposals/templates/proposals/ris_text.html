@@ -1,0 +1,16 @@
+{% extends "proposals/base.html" %}
+{% block title %}Текст РИС{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<div style="width: 50%; min-width: 320px; margin: 0 auto;">
+<h1>Текст РИС</h1>
+<p class="help" style="margin-bottom: 1rem;">Этот текст подставляется в переменную <strong>{% templatetag openvariable %} ris {% templatetag closevariable %}</strong> при формировании договора, если в шаге 2 отмечен чек-бокс «Включить пункт про РИС?».</p>
+<form method="post" action="{% url 'proposals:ris_text' %}">
+    {% csrf_token %}
+    <textarea name="ris_text" rows="12" placeholder="Введите текст пункта про РИС" style="width: 100%;">{{ ris_text }}</textarea>
+    <div class="actions">
+        <button type="submit">Сохранить</button>
+    </div>
+</form>
+</div>
+{% endblock %}

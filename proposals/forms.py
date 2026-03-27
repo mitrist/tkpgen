@@ -267,6 +267,11 @@ class ContractForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={'rows': 4}),
     )
+    include_ris = forms.BooleanField(
+        label='Включить пункт про РИС?',
+        required=False,
+        initial=False,
+    )
     # Реквизиты в подписи Заказчик
     name = forms.CharField(label='Наименование', max_length=500, required=False)
     address = forms.CharField(label='Юридический адрес', required=False, widget=forms.Textarea(attrs={'rows': 2}))

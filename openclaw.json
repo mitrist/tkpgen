@@ -1,0 +1,121 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.3.13",
+    "lastTouchedAt": "2026-03-14T14:53:22.502Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-14T14:23:48.879Z",
+    "lastRunVersion": "2026.3.13",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "custom-api-deepseek-com": {
+        "baseUrl": "https://api.deepseek.com",
+        "apiKey": "sk-77a3970d9e2f45a7ac6c2e2f0cd6f4f4",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "deepseek-reasoner",
+            "name": "deepseek-reasoner (Custom Provider)",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 16000,
+            "maxTokens": 4096
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "custom-api-deepseek-com/deepseek-reasoner"
+      },
+      "models": {
+        "custom-api-deepseek-com/deepseek-reasoner": {
+          "alias": "DeepSeek"
+        }
+      },
+      "workspace": "/home/mitrist12/.openclaw/workspace"
+    }
+  },
+  "tools": {
+    "profile": "coding"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "boot-md": {
+          "enabled": true
+        },
+        "bootstrap-extra-files": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "allowlist",
+      "botToken": "8678022391:AAG9Cdm4hKrAY423JOneX3e61Ly9cL4UrkE",
+      "allowFrom": [
+        826506744
+      ],
+      "groupAllowFrom": [
+        826506744
+      ],
+      "groupPolicy": "allowlist",
+      "streaming": "partial"
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "trustedProxies": [],
+    "auth": {
+      "mode": "token",
+      "token": "607140d2e826cbffa6b766db1995c591e57d11cc0eb8c46d"
+    },
+    "http": {
+      "endpoints": {
+        "responses": {
+          "enabled": true
+        }
+      }
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "enabled": true
+      }
+    }
+  }
+}

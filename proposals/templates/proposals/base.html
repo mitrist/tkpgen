@@ -29,8 +29,11 @@
         .sidebar.is-expanded .nav-section-title .nav-link-text { display: inline; }
         .sidebar.is-expanded a.nav-link { justify-content: flex-start; padding-left: 1rem; }
         .sidebar.is-expanded .nav-section-title { justify-content: flex-start; padding-left: 1rem; }
-        .sidebar.is-expanded .nav-section-items { position: static; opacity: 1; visibility: visible; pointer-events: auto; box-shadow: none; border: none; border-radius: 0; min-width: 0; padding-left: 0; margin-bottom: 0.25rem; }
-        .sidebar.is-expanded .nav-section-items a { padding-left: 1.25rem; }
+        .sidebar.is-expanded .nav-section-items { position: static; opacity: 1; visibility: visible; pointer-events: auto; box-shadow: none; border: none; border-radius: 0; min-width: 0; padding-left: 0; margin-bottom: 0.25rem; display: none; }
+        .sidebar.is-expanded .nav-section.is-open .nav-section-items { display: flex; }
+        .sidebar.is-expanded .nav-section-items a { padding-left: 2rem; position: relative; }
+        .sidebar.is-expanded .nav-section-items a::before { content: ''; position: absolute; left: 1.1rem; top: 50%; width: 0.55rem; height: 0; border-top: 1px solid rgba(255,255,255,.5); transform: translateY(-50%); }
+        .sidebar.is-expanded .nav-section-items { border-left: 1px solid rgba(255,255,255,.22); margin-left: 1.15rem; }
         .sidebar.is-expanded .nav-section:hover .nav-section-items { transition: none; }
         .sidebar-header { padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,.15); }
         .sidebar-header a { display: flex; align-items: center; justify-content: center; }
@@ -45,6 +48,9 @@
         .sidebar .nav-section-title:hover { background: rgba(255,255,255,.1); }
         .sidebar .nav-section-title::after { display: none; }
         .sidebar .nav-section-title .nav-link-text { display: none; }
+        .sidebar.is-expanded .nav-section-title { cursor: pointer; }
+        .sidebar.is-expanded .nav-section-title::after { display: inline-block; content: '▾'; margin-left: auto; font-size: 0.75rem; opacity: .9; transform: rotate(-90deg); transition: transform .2s ease; }
+        .sidebar.is-expanded .nav-section.is-open .nav-section-title::after { transform: rotate(0deg); }
         .sidebar .nav-section-items { display: flex; flex-direction: column; position: absolute; left: 100%; top: 0; min-width: 220px; background: var(--sidebar-gradient); border: 1px solid rgba(255,255,255,.1); border-left: none; border-radius: 0 8px 8px 0; box-shadow: 4px 4px 12px rgba(0,0,0,.25); padding: 0.5rem 0; z-index: 200; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.15s ease, visibility 0s linear 0.12s; }
         .sidebar .nav-section:hover .nav-section-items { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
         .sidebar .nav-section-items a { padding: 0.5rem 1rem; font-size: 0.9375rem; display: flex; align-items: center; gap: 0.5rem; justify-content: flex-start; border: none; border-radius: 0; }
@@ -101,7 +107,8 @@
         .topbar-dropdown .nav-section.is-open .nav-section-title::after { transform: rotate(90deg); }
         .topbar-dropdown .nav-section-items { display: none; }
         .topbar-dropdown .nav-section.is-open .nav-section-items { display: block; }
-        .topbar-dropdown .nav-section-items a { padding-left: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+        .topbar-dropdown .nav-section-items a { padding-left: 1.6rem; display: flex; align-items: center; gap: 0.5rem; position: relative; }
+        .topbar-dropdown .nav-section-items a::before { content: ''; position: absolute; left: 1rem; top: 50%; width: 0.45rem; height: 0; border-top: 1px solid rgba(255,255,255,.55); transform: translateY(-50%); }
         .topbar-dropdown .nav-link-icon { width: 1.125rem; height: 1.125rem; flex-shrink: 0; opacity: .9; }
         .topbar-dropdown .nav-link { display: flex; align-items: center; gap: 0.5rem; }
         .topbar-dropdown .nav-divider { height: 0; border: none; border-top: 1px solid rgba(255,255,255,.25); margin: 0.5rem 1rem; }
@@ -165,13 +172,31 @@
                         <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                         Комплексное ТКП
                     </a>
+                </div>
+            </div>
+            <div class="nav-section" data-nav-section="refs">
+                <div class="nav-section-title">
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-9-8h12M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Справочники и данные
+                    </span>
+                </div>
+                <div class="nav-section-items">
+                    <a href="{% url 'proposals:service_descriptions' %}" class="nav-link {% if request.resolver_match.url_name == 'service_descriptions' %}nav-active{% endif %}">
+                        <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+                        Редактирование описания услуги
+                    </a>
                     <a href="{% url 'proposals:tariffs' %}" class="nav-link {% if request.resolver_match.url_name == 'tariffs' %}nav-active{% endif %}" title="Посмотреть/Создать/Изменить тариф на услугу по регионам">
                         <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         Тарифы по регионам
                     </a>
-                    <a href="{% url 'proposals:service_descriptions' %}" class="nav-link {% if request.resolver_match.url_name == 'service_descriptions' %}nav-active{% endif %}">
-                        <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7"/></svg>
-                        Редактирование описания услуги
+                    <a href="{% url 'proposals:counterparties' %}" class="nav-link {% if request.resolver_match.url_name == 'counterparties' %}nav-active{% endif %}" title="Справочник контрагентов">
+                        <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        Контрагенты
+                    </a>
+                    <a href="{% url 'proposals:ris_text' %}" class="nav-link {% if request.resolver_match.url_name == 'ris_text' %}nav-active{% endif %}">
+                        <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h10M7 16h6M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Текст РИС
                     </a>
                 </div>
             </div>
@@ -179,10 +204,6 @@
             <a href="{% url 'proposals:kanban' %}" class="nav-link {% if request.resolver_match.url_name == 'kanban' %}nav-active{% endif %}" title="Канбан доска всех текущих сделок">
                 <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
                 Канбан
-            </a>
-            <a href="{% url 'proposals:counterparties' %}" class="nav-link {% if request.resolver_match.url_name == 'counterparties' %}nav-active{% endif %}" title="Справочник контрагентов">
-                <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                Контрагенты
             </a>
             <a href="{% url 'proposals:instruction' %}" class="nav-link {% if request.resolver_match.url_name == 'instruction' %}nav-active{% endif %}" title="Инструкция пользователя">
                 <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
@@ -229,13 +250,29 @@
                             <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                             <span class="nav-link-text">Комплексное ТКП</span>
                         </a>
+                    </div>
+                </div>
+                <div class="nav-section" data-nav-section="refs">
+                    <div class="nav-section-title" title="Справочники и данные">
+                        <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-9-8h12M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        <span class="nav-link-text">Справочники и данные</span>
+                    </div>
+                    <div class="nav-section-items">
+                        <a href="{% url 'proposals:service_descriptions' %}" class="nav-link {% if request.resolver_match.url_name == 'service_descriptions' %}nav-active{% endif %}">
+                            <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+                            <span class="nav-link-text">Редактирование описания услуги</span>
+                        </a>
                         <a href="{% url 'proposals:tariffs' %}" class="nav-link {% if request.resolver_match.url_name == 'tariffs' %}nav-active{% endif %}" title="Посмотреть/Создать/Изменить тариф на услугу по регионам">
                             <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span class="nav-link-text">Тарифы по регионам</span>
                         </a>
-                        <a href="{% url 'proposals:service_descriptions' %}" class="nav-link {% if request.resolver_match.url_name == 'service_descriptions' %}nav-active{% endif %}">
-                            <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7"/></svg>
-                            <span class="nav-link-text">Редактирование описания услуги</span>
+                        <a href="{% url 'proposals:counterparties' %}" class="nav-link {% if request.resolver_match.url_name == 'counterparties' %}nav-active{% endif %}" title="Справочник контрагентов">
+                            <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            <span class="nav-link-text">Контрагенты</span>
+                        </a>
+                        <a href="{% url 'proposals:ris_text' %}" class="nav-link {% if request.resolver_match.url_name == 'ris_text' %}nav-active{% endif %}">
+                            <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h10M7 16h6M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                            <span class="nav-link-text">Текст РИС</span>
                         </a>
                     </div>
                 </div>
@@ -243,10 +280,6 @@
                 <a href="{% url 'proposals:kanban' %}" class="nav-link {% if request.resolver_match.url_name == 'kanban' %}nav-active{% endif %}" title="Канбан доска всех текущих сделок">
                     <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
                     <span class="nav-link-text">Канбан</span>
-                </a>
-                <a href="{% url 'proposals:counterparties' %}" class="nav-link {% if request.resolver_match.url_name == 'counterparties' %}nav-active{% endif %}" title="Справочник контрагентов">
-                    <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    <span class="nav-link-text">Контрагенты</span>
                 </a>
                 <a href="{% url 'proposals:instruction' %}" class="nav-link {% if request.resolver_match.url_name == 'instruction' %}nav-active{% endif %}" title="Инструкция пользователя">
                     <svg class="nav-link-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
@@ -333,6 +366,27 @@
         var sidebarToggle = document.getElementById('sidebar-toggle');
         var SIDEBAR_STORAGE_KEY = 'sidebarExpanded';
         if (sidebar && sidebarToggle) {
+            var sidebarSections = sidebar.querySelectorAll('.nav-section');
+            sidebarSections.forEach(function(section) {
+                var title = section.querySelector('.nav-section-title');
+                if (!title) return;
+                title.addEventListener('click', function() {
+                    if (!sidebar.classList.contains('is-expanded')) return;
+                    section.classList.toggle('is-open');
+                });
+            });
+            function syncSidebarSections() {
+                var expanded = sidebar.classList.contains('is-expanded');
+                sidebarSections.forEach(function(section) {
+                    var active = section.querySelector('.nav-section-items .nav-active');
+                    if (expanded && active) {
+                        section.classList.add('is-open');
+                    }
+                    if (!expanded) {
+                        section.classList.remove('is-open');
+                    }
+                });
+            }
             function updateSidebarButton() {
                 var expanded = sidebar.classList.contains('is-expanded');
                 sidebarToggle.textContent = expanded ? '<' : '>';
@@ -343,10 +397,12 @@
                 sidebar.classList.add('is-expanded');
             }
             updateSidebarButton();
+            syncSidebarSections();
             sidebarToggle.addEventListener('click', function() {
                 sidebar.classList.toggle('is-expanded');
                 localStorage.setItem(SIDEBAR_STORAGE_KEY, sidebar.classList.contains('is-expanded'));
                 updateSidebarButton();
+                syncSidebarSections();
             });
         }
     })();

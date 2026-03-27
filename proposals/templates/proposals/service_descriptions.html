@@ -1,6 +1,8 @@
 {% extends "proposals/base.html" %}
 {% block title %}Редактирование описания услуги{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
 {% block content %}
+<div style="width: 50%; min-width: 320px; margin: 0 auto;">
 <h1>Редактирование описания услуги</h1>
 <p class="help" style="margin-bottom: 1rem;">Указанный здесь текст подставляется в поле «Комментарий» при выборе соответствующей услуги в форме «Комплексное ТКП». Вы можете изменить его в самой форме перед отправкой. Для переноса строки в ТКП используйте символ <strong>|</strong> (вертикальная черта).</p>
 <form method="post" action="{% url 'proposals:service_descriptions' %}">
@@ -18,4 +20,5 @@
         <a href="{% url 'proposals:complex_form' %}" class="btn btn-secondary">К Комплексному ТКП</a>
     </div>
 </form>
+</div>
 {% endblock %}

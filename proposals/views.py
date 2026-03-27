@@ -137,6 +137,8 @@ COMPLEX_SERVICE_DEFAULT_COMMENTS = {
 }
 
 COMPLEX_SERVICE_COMMENTS_FILE = 'data/complex_service_comments.json'
+RIS_TEXT_FILE = 'data/ris_text.txt'
+RIS_HEAD_TEXT = '10. ОСОБЫЕ УСЛОВИЯ'
 
 
 def _load_complex_service_comments_file():
@@ -158,6 +160,32 @@ def _save_complex_service_comments_file(comments_by_name):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(comments_by_name, f, ensure_ascii=False, indent=2)
+
+
+def _load_ris_text_file():
+    """Загружает текущий текст РИС из файла проекта."""
+    path = Path(settings.BASE_DIR) / RIS_TEXT_FILE
+    if not path.exists():
+        return ''
+    try:
+        return path.read_text(encoding='utf-8')
+    except Exception:
+        return ''
+
+
+def _normalize_ris_text(text):
+    """Нормализация текста РИС: единые переводы строк и удаление пустых строк."""
+    value = (text or '').replace('\r\n', '\n').replace('\r', '\n')
+    lines = [line.strip() for line in value.split('\n')]
+    non_empty_lines = [line for line in lines if line]
+    return '\n'.join(non_empty_lines).strip()
+
+
+def _save_ris_text_file(text):
+    """Сохраняет текст РИС в файл проекта."""
+    path = Path(settings.BASE_DIR) / RIS_TEXT_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_normalize_ris_text(text), encoding='utf-8')
 
 
 def _get_libreoffice_path():
@@ -195,23 +223,6 @@ def _convert_docx_to_pdf(docx_path, out_dir):
         [cmd, '--headless', '--convert-to', 'pdf', '--outdir', str(out_dir), str(docx_path)],
         check=True,
     )
-
-
-CONTRACT_FONT_NAME = 'Times New Roman'
-
-
-def _set_contract_doc_font_times_new_roman(doc):
-    """Устанавливает шрифт Times New Roman для всего документа договора (параграфы и ячейки таблиц)."""
-    docx = doc.docx
-    for paragraph in docx.paragraphs:
-        for run in paragraph.runs:
-            run.font.name = CONTRACT_FONT_NAME
-    for table in docx.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    for run in paragraph.runs:
-                        run.font.name = CONTRACT_FONT_NAME
 
 
 def _dolznost_from_customer_in_person(customer_in_person):
@@ -1346,6 +1357,7 @@ def contract_form_view(request, tkp_id):
         'date': date_str,
         'price': tkp.sum_total,
         'payment_terms': DEFAULT_PAYMENT_TERMS,
+        'include_ris': False,
         'room': tkp.room or '',
         's': tkp.s or '',
     }
@@ -1503,6 +1515,8 @@ def contract_form_view(request, tkp_id):
                     customer_represented_by = _director_genitive(cp.director or '')
                 customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
                 payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+                include_ris = bool(cd.get('include_ris'))
+                ris_text = _normalize_ris_text(_load_ris_text_file()) if include_ris else ''
                 customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
                 ctx = {
                     'contract_number': contract_number,
@@ -1518,6 +1532,8 @@ def contract_form_view(request, tkp_id):
                     'period_starts_from': (cd.get('period_starts_from') or '').strip(),
                     'price': _format_price(price_val),
                     'payment_terms': payment_terms,
+                    'ris': ris_text,
+                    'ris_head': RIS_HEAD_TEXT if include_ris else '',
                     'name': cd.get('name') or cp.name or '',
                     'address': cd.get('address') or cp.address or '',
                     'inn': cd.get('inn') or cp.inn or '',
@@ -1533,7 +1549,6 @@ def contract_form_view(request, tkp_id):
                 }
                 doc = DocxTemplate(str(template_path))
                 doc.render(ctx)
-                _set_contract_doc_font_times_new_roman(doc)
                 if is_complex_contract and tkp.rows_json:
                     with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp:
                         doc.save(tmp.name)
@@ -1583,6 +1598,8 @@ def contract_form_view(request, tkp_id):
                     customer_represented_by = _director_genitive(cp.director or '')
                 customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
                 payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+                include_ris = bool(cd.get('include_ris'))
+                ris_text = _normalize_ris_text(_load_ris_text_file()) if include_ris else ''
                 customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
                 ctx = {
                     'contract_number': contract_number,
@@ -1598,6 +1615,8 @@ def contract_form_view(request, tkp_id):
                     'period_starts_from': (cd.get('period_starts_from') or '').strip(),
                     'price': _format_price(price_val),
                     'payment_terms': payment_terms,
+                    'ris': ris_text,
+                    'ris_head': RIS_HEAD_TEXT if include_ris else '',
                     'name': cd.get('name') or cp.name or '',
                     'address': cd.get('address') or cp.address or '',
                     'inn': cd.get('inn') or cp.inn or '',
@@ -1613,7 +1632,6 @@ def contract_form_view(request, tkp_id):
                 }
                 doc = DocxTemplate(str(template_path))
                 doc.render(ctx)
-                _set_contract_doc_font_times_new_roman(doc)
                 out_format = (request.POST.get('format') or 'docx').strip().lower()
                 if out_format != 'pdf':
                     out_format = 'docx'
@@ -2447,6 +2465,21 @@ def service_descriptions_view(request):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
+def ris_text_view(request):
+    """Редактирование текста РИС (используется в переменной {{ ris }})."""
+    if request.method == 'POST':
+        ris_text = _normalize_ris_text(request.POST.get('ris_text') or '')
+        _save_ris_text_file(ris_text)
+        messages.success(request, 'Текст РИС сохранён.')
+        return redirect('proposals:ris_text')
+    context = {
+        'ris_text': _load_ris_text_file(),
+    }
+    return render(request, 'proposals/ris_text.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
 def requisites_add_view(request):
     """Загрузка карточки контрагента, извлечение реквизитов и формирование пользовательской карточки."""
     form = RequisitesParseForm()
@@ -2507,6 +2540,7 @@ def requisites_add_view(request):
         'card_data': card_data,
         'tkp_id': tkp_id,
         'from_contract': from_contract,
+        'contract_form_url': reverse('proposals:contract_form', args=[tkp_id]) if tkp_id else '',
     }
     return render(request, 'proposals/requisites_form.html', context)
 

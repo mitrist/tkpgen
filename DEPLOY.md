@@ -726,6 +726,29 @@ OPENCLAW_API_KEY=тот_же_токен_что_в_gateway.auth.token
 
 **Проверка:** отправьте боту сообщение в Telegram. В логах приложения не должно быть 401/400: `sudo journalctl -u tkp_generator -n 30`. Если 400 остаётся — в логе теперь будет тело ответа от OpenClaw (поле `error.message`), по нему можно уточнить причину.
 
+#### 3.7. HTTP 403: forbidden «Request not allowed»
+
+Если при запросах к шлюзу OpenClaw (в т.ч. из дашборда, чата или приложения ТКП) приходит ответ **HTTP 403: forbidden: Request not allowed**, это обычно рассинхрон авторизации шлюза (часто после обновления OpenClaw).
+
+**Что сделать на сервере (под пользователем OpenClaw):**
+
+1. Перегенерировать токен шлюза и подтянуть конфиг:
+   ```bash
+   openclaw doctor --repair --generate-gateway-token
+   ```
+2. Посмотреть новый токен в конфиге:
+   ```bash
+   openclaw config get gateway.auth
+   ```
+3. Подставить **тот же токен** в `.env` приложения ТКП в переменную `OPENCLAW_API_KEY`.
+4. Перезапустить шлюз и приложение:
+   ```bash
+   openclaw gateway restart
+   sudo systemctl restart tkp_generator
+   ```
+
+Если используете свой токен в `openclaw.json` (не сгенерированный `doctor`), убедитесь, что в запросах к шлюзу заголовок `Authorization: Bearer <токен>` совпадает с `gateway.auth.token` в `~/.openclaw/openclaw.json`.
+
 ### 4. Проверка
 
 1. Отправьте боту в Telegram сообщение (например «Привет» или «Хочу ТКП»).
