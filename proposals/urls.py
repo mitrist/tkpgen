@@ -25,6 +25,7 @@ urlpatterns = [
     path('max/api/requisites/save/', max_views.max_requisites_save_view, name='max_requisites_save'),
     path('max/api/counterparties/', max_views.max_counterparties_view, name='max_counterparties'),
     path('max/api/counterparties/<int:pk>/', max_views.max_counterparty_detail_view, name='max_counterparty_detail'),
+    path('max/api/tkps/', max_views.max_tkps_view, name='max_tkps'),
     path('max/api/contract/submit/', max_views.max_contract_submit_view, name='max_contract_submit'),
     path('max/api/download/<str:file_type>/', max_views.max_download_view, name='max_download'),
     path('tkp-app/', miniapp_menu_view),

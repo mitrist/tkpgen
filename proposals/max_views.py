@@ -12,6 +12,7 @@ from functools import wraps
 from pathlib import Path
 
 from django.conf import settings
+from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -343,6 +344,32 @@ def max_counterparty_detail_view(request, pk):
             "phone": cp.phone or "",
         }
     )
+
+
+@require_http_methods(["GET"])
+@csrf_exempt
+@_max_auth_required
+def max_tkps_view(request):
+    """Список последних ТКП для выбора в mini app."""
+    q = (request.GET.get("q") or "").strip()
+    qs = TKPRecord.objects.all().order_by("-created_at")
+    if q:
+        qs = qs.filter(
+            Q(number__icontains=q)
+            | Q(client__icontains=q)
+            | Q(service__icontains=q)
+        )
+    data = list(
+        qs.values(
+            "id",
+            "number",
+            "date",
+            "client",
+            "service",
+            "sum_total",
+        )[:150]
+    )
+    return JsonResponse({"results": data})
 
 
 def _build_contract_context(cd, cp, tkp):
