@@ -11,6 +11,25 @@
 .contract-steps .line.done { background: #45277B; }
 .contract-form-wrap { width: 70%; max-width: 1000px; margin: 0 auto; }
 @media (max-width: 768px) { .contract-form-wrap { width: 100%; } }
+.payment-terms-heading { font-weight: 600; margin-bottom: 0.5rem; display: block; }
+.payment-terms-cards { display: flex; flex-direction: column; gap: 0.75rem; }
+.payment-terms-card {
+  display: block;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+}
+.payment-terms-card:has(input:checked) {
+  border-color: #45277B;
+  box-shadow: 0 0 0 1px #45277B;
+}
+.payment-terms-card .pay-radio-row { display: flex; align-items: flex-start; gap: 0.65rem; }
+.payment-terms-card input[type=radio] { margin-top: 0.25rem; width: 1.1rem; height: 1.1rem; accent-color: #45277B; flex-shrink: 0; }
+.payment-terms-card .pay-title { font-weight: 600; margin-bottom: 0.35rem; display: block; }
+.payment-terms-card .pay-desc { font-size: 0.8rem; line-height: 1.35; color: #475569; display: block; }
 </style>
 
 <div class="contract-steps">
@@ -32,6 +51,63 @@
         {{ form.complex_contract_type.label_tag }}
         {{ form.complex_contract_type }}
         {% if form.complex_contract_type.errors %}<ul class="errorlist">{{ form.complex_contract_type.errors }}</ul>{% endif %}
+    </div>
+    <div id="nav-contract-extras" style="margin-bottom: 1.25rem; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: {% if show_nav_contract_fields %}block{% else %}none{% endif %};">
+        <h2 style="font-size: 1rem; margin: 0 0 0.75rem;">Дополнительно для договора «Навигация и контент-система»</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+                {{ form.nav_count.label_tag }}
+                {{ form.nav_count }}
+                {% if form.nav_count.errors %}<ul class="errorlist">{{ form.nav_count.errors }}</ul>{% endif %}
+            </div>
+            <div>
+                {{ form.stend_count.label_tag }}
+                {{ form.stend_count }}
+                {% if form.stend_count.errors %}<ul class="errorlist">{{ form.stend_count.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.dney.label_tag }}
+                {% if form.dney.help_text %}<p class="help" style="font-size: 0.85rem; line-height: 1.4; color: #64748b; margin: 0.25rem 0 0.5rem;">{{ form.dney.help_text }}</p>{% endif %}
+                {{ form.dney }}
+                {% if form.dney.errors %}<ul class="errorlist">{{ form.dney.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.otv_zak.label_tag }}
+                {{ form.otv_zak }}
+                {% if form.otv_zak.errors %}<ul class="errorlist">{{ form.otv_zak.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1;">
+                {{ form.otv_isp.label_tag }}
+                {{ form.otv_isp }}
+                {% if form.otv_isp.errors %}<ul class="errorlist">{{ form.otv_isp.errors }}</ul>{% endif %}
+            </div>
+            <div style="grid-column: 1 / -1; margin-top: 0.25rem;">
+                <span class="payment-terms-heading">{{ form.poryadok.label }}</span>
+                {% with pk_val=form.poryadok.value|default:'1' %}
+                <div class="payment-terms-cards">
+                    <label class="payment-terms-card">
+                        <span class="pay-radio-row">
+                            <input type="radio" name="poryadok" value="1" {% if pk_val == '1' %}checked{% endif %}>
+                            <span>
+                                <span class="pay-title">Вариант 1</span>
+                                <span class="pay-desc">не позднее 20 рабочих дней с даты заключения Договора и внесения предоплаты Заказчиком</span>
+                            </span>
+                        </span>
+                    </label>
+                    <label class="payment-terms-card">
+                        <span class="pay-radio-row">
+                            <input type="radio" name="poryadok" value="2" {% if pk_val == '2' %}checked{% endif %}>
+                            <span>
+                                <span class="pay-title">Вариант 2</span>
+                                <span class="pay-desc">с даты заключения Договора</span>
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                {% endwith %}
+                {% if form.poryadok.errors %}<ul class="errorlist">{{ form.poryadok.errors }}</ul>{% endif %}
+            </div>
+        </div>
     </div>
     {% endif %}
     {% if contract_draft_id %}<input type="hidden" name="contract_draft_id" value="{{ contract_draft_id }}">{% endif %}
@@ -98,8 +174,29 @@
                 {% if form.period_starts_from.errors %}<ul class="errorlist">{{ form.period_starts_from.errors }}</ul>{% endif %}
             </div>
             <div style="grid-column: 1 / -1;">
-                {{ form.payment_terms.label_tag }}
-                {{ form.payment_terms }}
+                <span class="payment-terms-heading">{{ form.payment_terms.label }}</span>
+                {% with pt_val=form.payment_terms.value|default:'2' %}
+                <div class="payment-terms-cards">
+                    <label class="payment-terms-card">
+                        <span class="pay-radio-row">
+                            <input type="radio" name="payment_terms" value="1" {% if pt_val == '1' %}checked{% endif %}>
+                            <span>
+                                <span class="pay-title">Вариант 1</span>
+                                <span class="pay-desc">2.2. Расчеты по Договору производятся на основании выставленного Исполнителем счета не позднее 10 рабочих дней с даты подписания Заказчиком товарной накладной/универсального передаточного документа (УПД).</span>
+                            </span>
+                        </span>
+                    </label>
+                    <label class="payment-terms-card">
+                        <span class="pay-radio-row">
+                            <input type="radio" name="payment_terms" value="2" {% if pt_val == '2' %}checked{% endif %}>
+                            <span>
+                                <span class="pay-title">Вариант 2</span>
+                                <span class="pay-desc">2.2. Оплата по договору производится в следующем порядке: 2.2.1. В течение 5 рабочих дней на основании выставленного Исполнителем счета Заказчик выплачивает Исполнителю аванс в размере 30% от цены Договора; 2.2.2. В течение 5 рабочих дней с даты подписания товарной накладной/универсального передаточного документа (УПД) Заказчик выплачивает Исполнителю оставшиеся 70% цены Договора.</span>
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                {% endwith %}
                 {% if form.payment_terms.errors %}<ul class="errorlist">{{ form.payment_terms.errors }}</ul>{% endif %}
             </div>
             <div style="grid-column: 1 / -1;">
@@ -188,6 +285,21 @@
     </div>
 </form>
 </div>
+
+{% if is_complex_contract %}
+<script>
+(function() {
+  var sel = document.getElementById('id_complex_contract_type');
+  var box = document.getElementById('nav-contract-extras');
+  var navTmpl = '{{ nav_contract_template_filename|escapejs }}';
+  if (!sel || !box) return;
+  function sync() {
+    box.style.display = sel.value === navTmpl ? 'block' : 'none';
+  }
+  sel.addEventListener('change', sync);
+})();
+</script>
+{% endif %}
 
 <div id="email-modal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-box" style="background: var(--bg, #fff); border-radius: 10px; max-width: 480px; width: 90%; padding: 1.25rem; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">

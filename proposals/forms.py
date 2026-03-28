@@ -1,6 +1,11 @@
 from django import forms
 from .choices import INTERNAL_CLIENT_CHOICES, SROK_CHOICES
+from .contract_payment_terms import PAYMENT_TERMS_CHOICE_1, PAYMENT_TERMS_CHOICE_2
+from .contract_poryadok import PORYADOK_CHOICE_1, PORYADOK_CHOICE_2
 from .models import Counterparty, Region, Service
+
+# Совпадает с proposals.views.COMPLEX_CONTRACT_TEMPLATE_03
+CONTRACT_TEMPLATE_NAV_CONTENT_COMPLEX = '03_Договор_Навигация.docx'
 
 
 class ProposalForm(forms.Form):
@@ -261,11 +266,15 @@ class ContractForm(forms.Form):
         required=False,
     )
     price = forms.DecimalField(label='Цена договора', max_digits=15, decimal_places=2, required=True)
-    payment_terms = forms.CharField(
+    payment_terms = forms.ChoiceField(
         label='Условия оплаты',
-        max_length=2000,
-        required=False,
-        widget=forms.Textarea(attrs={'rows': 4}),
+        choices=[
+            (PAYMENT_TERMS_CHOICE_1, 'Вариант 1'),
+            (PAYMENT_TERMS_CHOICE_2, 'Вариант 2'),
+        ],
+        initial=PAYMENT_TERMS_CHOICE_2,
+        required=True,
+        widget=forms.RadioSelect,
     )
     include_ris = forms.BooleanField(
         label='Включить пункт про РИС?',
@@ -286,16 +295,81 @@ class ContractForm(forms.Form):
     # Из ТКП: границы подготовки документации
     room = forms.CharField(label='Параметры объекта / помещение', required=False, widget=forms.Textarea(attrs={'rows': 2}))
     s = forms.CharField(label='Площадь / количество', max_length=100, required=False)
-    # Для комплексного ТКП: выбор типа договора (шаблон 05 или 08)
+    # Для комплексного ТКП: выбор типа договора (03 и 08; 05 — только одиночная услуга «Навигация_стенды»)
     complex_contract_type = forms.ChoiceField(
         label='Комплексный договор',
         choices=[
             ('', '— выберите —'),
-            ('05_Договор_Контент_Навигация.docx', 'Контент и навигация'),
+            (CONTRACT_TEMPLATE_NAV_CONTENT_COMPLEX, 'Навигация и контент-система'),
+            (CONTRACT_TEMPLATE_NAV_CONTENT_COMPLEX, 'Контент и навигация'),
             ('08_Договор_ДПФ_Благоустройство.docx', 'ДПФ и Благоустройство'),
         ],
         required=False,
     )
+    nav_count = forms.IntegerField(
+        label='Навигация не более __ шт.',
+        min_value=1,
+        required=False,
+    )
+    stend_count = forms.IntegerField(
+        label='Стенды, не более __ шт.',
+        min_value=1,
+        required=False,
+    )
+    dney = forms.IntegerField(
+        label='Доставка и монтаж',
+        min_value=2,
+        required=False,
+        help_text=(
+            'Изготовление, доставка и монтаж навигационной продукции осуществляются после согласования '
+            'макетов, по заявке Заказчика, в течение __ рабочих дней с даты получения соответствующей '
+            'заявки Исполнителем.'
+        ),
+    )
+    otv_zak = forms.CharField(
+        label='Ответственный со стороны заказчика',
+        max_length=500,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'ФИО, должность, тел.'}),
+    )
+    otv_isp = forms.CharField(
+        label='Ответственный со стороны Исполнителя',
+        max_length=500,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'ФИО, должность, тел.'}),
+    )
+    poryadok = forms.ChoiceField(
+        label='Порядок, сроки, условия поставки',
+        choices=[
+            (PORYADOK_CHOICE_1, 'Вариант 1'),
+            (PORYADOK_CHOICE_2, 'Вариант 2'),
+        ],
+        initial=PORYADOK_CHOICE_1,
+        required=False,
+        widget=forms.RadioSelect,
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        ct = (self.data.get('complex_contract_type') or '').strip()
+        if ct == CONTRACT_TEMPLATE_NAV_CONTENT_COMPLEX:
+            nav = cleaned.get('nav_count')
+            stend = cleaned.get('stend_count')
+            if nav is None:
+                self.add_error('nav_count', 'Укажите количество.')
+            if stend is None:
+                self.add_error('stend_count', 'Укажите количество.')
+            dney_val = cleaned.get('dney')
+            if dney_val is None:
+                self.add_error('dney', 'Укажите число рабочих дней (больше 1).')
+            if not (cleaned.get('otv_zak') or '').strip():
+                self.add_error('otv_zak', 'Заполните поле.')
+            if not (cleaned.get('otv_isp') or '').strip():
+                self.add_error('otv_isp', 'Заполните поле.')
+            po = (cleaned.get('poryadok') or '').strip()
+            if po not in (PORYADOK_CHOICE_1, PORYADOK_CHOICE_2):
+                self.add_error('poryadok', 'Выберите вариант поставки.')
+        return cleaned
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

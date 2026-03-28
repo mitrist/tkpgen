@@ -8,6 +8,8 @@
             <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88);">В лице (им. п.)</td><td style="padding: 0.25rem 0; color: #fff;">{{ customer_represented_by_nominative|default:"—" }}</td></tr>
             <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88);">Сумма</td><td style="padding: 0.25rem 0; color: #fff;">{{ price }} ₽</td></tr>
             <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88); vertical-align: top;">Условия оплаты</td><td style="padding: 0.25rem 0; white-space: pre-wrap; color: #fff;">{{ payment_terms|default:"—" }}</td></tr>
+            {% if poryadok %}<tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88); vertical-align: top;">Порядок, сроки, условия поставки</td><td style="padding: 0.25rem 0; white-space: pre-wrap; color: #fff;">{{ poryadok }}</td></tr>{% endif %}
+            {% if dney %}<tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88); vertical-align: top;">Доставка и монтаж (дней)</td><td style="padding: 0.25rem 0; color: #fff;">{{ dney }}</td></tr>{% endif %}
         </table>
     </section>
     <section style="margin-bottom: 1rem;">
@@ -30,6 +32,7 @@
         <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; color: #fff;">
             <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88); width: 12rem;">Помещение / объект</td><td style="padding: 0.25rem 0; color: #fff;">{{ room|default:"—" }}</td></tr>
             <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88);">Площадь (S)</td><td style="padding: 0.25rem 0; color: #fff;">{{ s|default:"—" }}</td></tr>
+            {% if text %}<tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: rgba(255,255,255,0.88); vertical-align: top;">Текст из ТКП</td><td style="padding: 0.25rem 0; white-space: pre-wrap; color: #fff;">{{ text }}</td></tr>{% endif %}
         </table>
     </section>
 </div>

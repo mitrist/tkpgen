@@ -35,10 +35,13 @@ from .requisites_parser import FIELD_ORDER, parse_requisites_file
 from .telegram_miniapp import _draft_from_form_data
 from .tkp_draft_service import submit_final
 from .tkp_reference import get_tkp_reference_data
+from .contract_payment_terms import PAYMENT_TERMS_CHOICE_2, payment_terms_text_for_doc
+from .contract_poryadok import PORYADOK_CHOICE_1
 from .views import (
+    COMPLEX_CONTRACTS_WITH_SPEC_TABLE,
+    COMPLEX_CONTRACT_TEMPLATE_03,
     CONTRACT_SPEC_TABLE_PLACEHOLDER,
     CONTRACT_TEMPLATES_SUBDIR,
-    DEFAULT_PAYMENT_TERMS,
     SERVICE_TO_CONTRACT_TEMPLATE,
     _build_complex_table_document,
     _complex_rows_json_to_ctx,
@@ -52,6 +55,8 @@ from .views import (
     _load_ris_text_file,
     _normalize_ris_text,
     _save_complex_tkp_record,
+    contract_template_extras_for_ctx,
+    get_contract_template_for_complex_tkp,
 )
 
 logger = logging.getLogger(__name__)
@@ -400,7 +405,7 @@ def max_tkps_view(request):
     return JsonResponse({"results": data})
 
 
-def _build_contract_context(cd, cp, tkp):
+def _build_contract_context(cd, cp, tkp, contract_template_file=""):
     include_ris = bool(cd.get("include_ris"))
     ris_text = _normalize_ris_text(_load_ris_text_file()) if include_ris else ""
     customer_name = (cd.get("customer_name") or "").strip() or (cp.name or "")
@@ -408,7 +413,8 @@ def _build_contract_context(cd, cp, tkp):
     customer_represented_by_nominative = (cd.get("customer_represented_by_nominative") or "").strip() or (cp.director or "")
     price_val = cd["price"]
     customer_in_person_raw = (cd.get("customer_in_person") or "").strip()
-    return {
+    payment_terms_txt = payment_terms_text_for_doc(cd.get("payment_terms"))
+    base = {
         "customer_name": customer_name,
         "customer_represented_by": customer_represented_by,
         "customer_represented_by_nominative": customer_represented_by_nominative,
@@ -418,7 +424,8 @@ def _build_contract_context(cd, cp, tkp):
         "work_completion_period": (cd.get("work_completion_period") or "").strip(),
         "period_starts_from": (cd.get("period_starts_from") or "").strip(),
         "price": _format_price(price_val),
-        "payment_terms": (cd.get("payment_terms") or "").strip() or DEFAULT_PAYMENT_TERMS,
+        "payment_terms": payment_terms_txt,
+        "usl": payment_terms_txt,
         "ris": ris_text,
         "ris_head": "10. ОСОБЫЕ УСЛОВИЯ" if include_ris else "",
         "name": cd.get("name") or cp.name or "",
@@ -433,7 +440,10 @@ def _build_contract_context(cd, cp, tkp):
         "email": cd.get("email") or cp.email or "",
         "room": cd.get("room") or tkp.room or "",
         "s": cd.get("s") or tkp.s or "",
+        "text": (tkp.text or "").strip(),
     }
+    base.update(contract_template_extras_for_ctx(cd, contract_template_file))
+    return base
 
 
 @require_http_methods(["POST"])
@@ -454,7 +464,11 @@ def max_contract_submit_view(request):
 
     is_complex_contract = tkp.service == "Комплексное ТКП"
     if is_complex_contract:
-        contract_template_file = (body.get("complex_contract_type") or "").strip() or "05_Договор_Контент_Навигация.docx"
+        contract_template_file = (body.get("complex_contract_type") or "").strip()
+        if not contract_template_file:
+            contract_template_file = (
+                get_contract_template_for_complex_tkp(tkp.rows_json or []) or COMPLEX_CONTRACT_TEMPLATE_03
+            )
     else:
         contract_template_file = SERVICE_TO_CONTRACT_TEMPLATE.get(tkp.service)
         if not contract_template_file:
@@ -463,7 +477,9 @@ def max_contract_submit_view(request):
     mutable = dict(body)
     mutable.setdefault("date", tkp.date.strftime("%Y-%m-%d"))
     mutable.setdefault("price", str(tkp.sum_total or 0))
-    mutable.setdefault("payment_terms", DEFAULT_PAYMENT_TERMS)
+    mutable.setdefault("payment_terms", PAYMENT_TERMS_CHOICE_2)
+    mutable.setdefault("poryadok", PORYADOK_CHOICE_1)
+    mutable.setdefault("dney", 20)
     mutable.setdefault("room", tkp.room or "")
     mutable.setdefault("s", tkp.s or "")
     mutable.setdefault("complex_contract_type", contract_template_file if is_complex_contract else "")
@@ -479,7 +495,7 @@ def max_contract_submit_view(request):
         "contract_number": contract_number,
         "number": contract_number,
         "date": date_obj.strftime("%d.%m.%Y"),
-        **_build_contract_context(cd, cp, tkp),
+        **_build_contract_context(cd, cp, tkp, contract_template_file),
     }
     templates_dir = Path(getattr(settings, "TEMPLATES_DOCX_DIR", Path(settings.BASE_DIR) / "templates_docx"))
     template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
@@ -495,7 +511,11 @@ def max_contract_submit_view(request):
     doc = DocxTemplate(str(template_path))
     doc.render(ctx)
     doc.save(str(docx_path))
-    if is_complex_contract and tkp.rows_json:
+    if (
+        is_complex_contract
+        and tkp.rows_json
+        and contract_template_file in COMPLEX_CONTRACTS_WITH_SPEC_TABLE
+    ):
         rows_ctx, total_fmt = _complex_rows_json_to_ctx(tkp.rows_json)
         table_doc = _build_complex_table_document(rows_ctx, total_fmt)
         _insert_table_into_docx(str(docx_path), table_doc, CONTRACT_SPEC_TABLE_PLACEHOLDER)
@@ -546,7 +566,7 @@ def max_download_view(request, file_type):
     base_name = request.GET.get("f", "").strip()
     if not base_name or file_type not in ("pdf", "docx"):
         raise Http404()
-    if not re.match(r"^[a-zA-Z0-9_\-\u0400-\u04FF]+$", base_name):
+    if not re.match(r"^[a-zA-Z0-9_+\-\u0400-\u04FF\u00AB\u00BB\u2116]+$", base_name):
         raise Http404()
     out_dir = Path(getattr(settings, "TKP_OUTPUT_DIR", settings.BASE_DIR / "TKP_output"))
     ext = "pdf" if file_type == "pdf" else "docx"

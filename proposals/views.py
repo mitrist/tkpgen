@@ -27,6 +27,12 @@ except ImportError:
     import pypandoc
 from docxtpl import DocxTemplate
 
+from .contract_payment_terms import PAYMENT_TERMS_CHOICE_2, payment_terms_text_for_doc
+from .contract_poryadok import (
+    PORYADOK_CHOICE_1,
+    PORYADOK_CHOICE_2,
+    poryadok_text_for_doc,
+)
 from .forms import ComplexProposalForm, ContractForm, ProposalForm, RequisitesParseForm, SROK_CHOICES, TariffForm
 from .models import (
     ContractRecord,
@@ -66,11 +72,26 @@ SERVICE_TO_CONTRACT_TEMPLATE = {
 CONTRACT_SPEC_TABLE_PLACEHOLDER = '___CONTRACT_SPEC_TABLE___'
 
 
+# Шаблоны комплексных договоров (подпапка contracts_templates)
+COMPLEX_CONTRACT_TEMPLATE_03 = '03_Договор_Навигация.docx'
+COMPLEX_CONTRACT_TEMPLATE_05 = '05_Договор_Контент_Навигация.docx'
+COMPLEX_CONTRACT_TEMPLATE_08 = '08_Договор_ДПФ_Благоустройство.docx'
+
+# Комплексные договоры, куда вставляется таблица спецификации из ТКП
+COMPLEX_CONTRACTS_WITH_SPEC_TABLE = (
+    COMPLEX_CONTRACT_TEMPLATE_03,
+    COMPLEX_CONTRACT_TEMPLATE_05,
+    COMPLEX_CONTRACT_TEMPLATE_08,
+)
+
+
 def get_contract_template_for_complex_tkp(rows):
     """
     Определяет шаблон договора для комплексного ТКП по составу строк.
     - 08: если есть обе услуги Фасад и Благоустройство.
-    - 05: если есть не менее двух из трёх: Навигация, Контент, Навигация_стенды.
+    - 03: если одновременно есть Навигация и Контент (контент-система).
+    - 03: если есть не менее двух из трёх: Навигация, Контент, Навигация_стенды
+      (и не сработало правило «Навигация+Контент» выше — то же шаблон 03, что и «Контент и навигация»).
     Возвращает имя файла шаблона или None.
     """
     if not rows:
@@ -79,11 +100,43 @@ def get_contract_template_for_complex_tkp(rows):
     has_facade = 'Фасад' in service_names
     has_blag = 'Благоустройство' in service_names
     if has_facade and has_blag:
-        return '08_Договор_ДПФ_Благоустройство.docx'
+        return COMPLEX_CONTRACT_TEMPLATE_08
+    if 'Навигация' in service_names and 'Контент' in service_names:
+        return COMPLEX_CONTRACT_TEMPLATE_03
     nav_content_count = sum(1 for s in ('Навигация', 'Контент', 'Навигация_стенды') if s in service_names)
     if nav_content_count >= 2:
-        return '05_Договор_Контент_Навигация.docx'
+        return COMPLEX_CONTRACT_TEMPLATE_03
     return None
+
+
+def contract_template_extras_for_ctx(cd, contract_template_file):
+    """Доп. переменные для шаблона 03 (Навигация + Контент в комплексном ТКП)."""
+    empty_nav = {
+        'nav_count': '',
+        'stend_count': '',
+        'otv_zak': '',
+        'otv_isp': '',
+        'poryadok': '',
+        'dney': '',
+    }
+    if contract_template_file != COMPLEX_CONTRACT_TEMPLATE_03:
+        return empty_nav
+    po_raw = cd.get('poryadok')
+    po_st = (str(po_raw).strip() if po_raw is not None else '')
+    if po_st not in (PORYADOK_CHOICE_1, PORYADOK_CHOICE_2):
+        poryadok_val = ''
+    else:
+        poryadok_val = poryadok_text_for_doc(po_st)
+    dney_raw = cd.get('dney')
+    dney_str = str(int(dney_raw)) if dney_raw is not None else ''
+    return {
+        'nav_count': str(cd.get('nav_count') if cd.get('nav_count') is not None else ''),
+        'stend_count': str(cd.get('stend_count') if cd.get('stend_count') is not None else ''),
+        'otv_zak': (cd.get('otv_zak') or '').strip(),
+        'otv_isp': (cd.get('otv_isp') or '').strip(),
+        'poryadok': poryadok_val,
+        'dney': dney_str,
+    }
 
 
 def _complex_rows_json_to_ctx(rows_json):
@@ -104,10 +157,6 @@ def _complex_rows_json_to_ctx(rows_json):
             'total_formatted': _format_price(Decimal(str(r.get('total') or 0))),
         })
     return rows_ctx, _format_price(total)
-
-# Текст условий оплаты по умолчанию для договора
-DEFAULT_PAYMENT_TERMS = """2.2.1. В течение 5 (пяти) рабочих дней на основании выставленного Исполнителем счета Заказчик выплачивает Исполнителю аванс в размере 30% от цены Договора;
-2.2.2. В течение 5 (пяти) рабочих дней после приемки/утверждения результатов работ Заказчик выплачивает Исполнителю оставшиеся 70% цены Договора."""
 
 # Отображаемые названия услуг в форме «Комплексное ТКП» (колонка «Компонент услуги»)
 COMPLEX_SERVICE_DISPLAY_NAMES = {
@@ -591,8 +640,8 @@ def download_file_view(request, file_type):
     base_name = request.GET.get('f', '').strip()
     if not base_name or file_type not in ('pdf', 'docx'):
         raise Http404()
-    # Допускаем буквы (латиница, кириллица), цифры, _, -, « », №
-    if not re.match(r'^[a-zA-Z0-9_\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
+    # Допускаем буквы (латиница, кириллица), цифры, _, -, +, « », № (+ встречается в sanitize имени клиента)
+    if not re.match(r'^[a-zA-Z0-9_+\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
         raise Http404()
     out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
     ext = 'pdf' if file_type == 'pdf' else 'docx'
@@ -608,7 +657,7 @@ def download_file_view(request, file_type):
 
 def _validate_tkp_base_name(base_name):
     """Проверка base_name и путь к PDF в TKP_output. Возвращает (path, error)."""
-    if not base_name or not re.match(r'^[a-zA-Z0-9_\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
+    if not base_name or not re.match(r'^[a-zA-Z0-9_+\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
         return None, 'Недопустимое имя файла'
     out_dir = Path(getattr(settings, 'TKP_OUTPUT_DIR', settings.BASE_DIR / 'TKP_output'))
     path = out_dir / f'{base_name}.pdf'
@@ -1317,9 +1366,6 @@ def contract_form_view(request, tkp_id):
         messages.error(request, 'Запись ТКП не найдена.')
         return redirect('proposals:table')
 
-    COMPLEX_CONTRACT_TEMPLATE_05 = '05_Договор_Контент_Навигация.docx'
-    COMPLEX_CONTRACT_TEMPLATE_08 = '08_Договор_ДПФ_Благоустройство.docx'
-
     if tkp.service == 'Комплексное ТКП':
         is_complex_contract = True
         # Шаблон выбирается пользователем в форме (поле «Комплексный договор»), по умолчанию — 05
@@ -1356,13 +1402,22 @@ def contract_form_view(request, tkp_id):
         'contract_number': next_contract_number,
         'date': date_str,
         'price': tkp.sum_total,
-        'payment_terms': DEFAULT_PAYMENT_TERMS,
+        'payment_terms': PAYMENT_TERMS_CHOICE_2,
         'include_ris': False,
         'room': tkp.room or '',
         's': tkp.s or '',
+        'poryadok': PORYADOK_CHOICE_1,
+        'dney': 20,
     }
     if is_complex_contract:
-        initial['complex_contract_type'] = COMPLEX_CONTRACT_TEMPLATE_05
+        suggested_tpl = get_contract_template_for_complex_tkp(tkp.rows_json or [])
+        if suggested_tpl in (
+            COMPLEX_CONTRACT_TEMPLATE_03,
+            COMPLEX_CONTRACT_TEMPLATE_08,
+        ):
+            initial['complex_contract_type'] = suggested_tpl
+        else:
+            initial['complex_contract_type'] = COMPLEX_CONTRACT_TEMPLATE_03
     if draft_record:
         initial['contract_number'] = draft_record.number
         initial['date'] = draft_record.date.strftime('%Y-%m-%d')
@@ -1398,9 +1453,9 @@ def contract_form_view(request, tkp_id):
     else:
         initial['customer_name'] = tkp.client or ''
 
-    # Для комплексного ТКП шаблон берём из выбора пользователя (по умолчанию 05)
+    # Для комплексного ТКП шаблон берём из выбора пользователя (по умолчанию 03)
     if is_complex_contract:
-        contract_template_file = initial.get('complex_contract_type') or COMPLEX_CONTRACT_TEMPLATE_05
+        contract_template_file = initial.get('complex_contract_type') or COMPLEX_CONTRACT_TEMPLATE_03
     template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
     if not template_path.exists():
         messages.error(request, f'Шаблон договора не найден: {contract_template_file}')
@@ -1411,10 +1466,13 @@ def contract_form_view(request, tkp_id):
         # Для комплексного ТКП шаблон берём из выбора в форме
         if is_complex_contract:
             ct = (request.POST.get('complex_contract_type') or '').strip()
-            if ct in (COMPLEX_CONTRACT_TEMPLATE_05, COMPLEX_CONTRACT_TEMPLATE_08):
+            if ct in (
+                COMPLEX_CONTRACT_TEMPLATE_03,
+                COMPLEX_CONTRACT_TEMPLATE_08,
+            ):
                 contract_template_file = ct
             else:
-                contract_template_file = COMPLEX_CONTRACT_TEMPLATE_05
+                contract_template_file = COMPLEX_CONTRACT_TEMPLATE_03
             template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
         save_draft = request.POST.get('save_draft')
         if save_draft:
@@ -1514,7 +1572,7 @@ def contract_form_view(request, tkp_id):
                 if not customer_represented_by:
                     customer_represented_by = _director_genitive(cp.director or '')
                 customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
-                payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+                payment_terms = payment_terms_text_for_doc(cd.get('payment_terms'))
                 include_ris = bool(cd.get('include_ris'))
                 ris_text = _normalize_ris_text(_load_ris_text_file()) if include_ris else ''
                 customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
@@ -1532,6 +1590,7 @@ def contract_form_view(request, tkp_id):
                     'period_starts_from': (cd.get('period_starts_from') or '').strip(),
                     'price': _format_price(price_val),
                     'payment_terms': payment_terms,
+                    'usl': payment_terms,
                     'ris': ris_text,
                     'ris_head': RIS_HEAD_TEXT if include_ris else '',
                     'name': cd.get('name') or cp.name or '',
@@ -1546,6 +1605,8 @@ def contract_form_view(request, tkp_id):
                     'email': cd.get('email') or cp.email or '',
                     'room': cd.get('room') or tkp.room or '',
                     's': cd.get('s') or tkp.s or '',
+                    'text': (tkp.text or '').strip(),
+                    **contract_template_extras_for_ctx(cd, contract_template_file),
                 }
                 doc = DocxTemplate(str(template_path))
                 doc.render(ctx)
@@ -1597,7 +1658,7 @@ def contract_form_view(request, tkp_id):
                 if not customer_represented_by:
                     customer_represented_by = _director_genitive(cp.director or '')
                 customer_represented_by_nominative = (cd.get('customer_represented_by_nominative') or '').strip() or (cp.director or '')
-                payment_terms = (cd.get('payment_terms') or '').strip() or DEFAULT_PAYMENT_TERMS
+                payment_terms = payment_terms_text_for_doc(cd.get('payment_terms'))
                 include_ris = bool(cd.get('include_ris'))
                 ris_text = _normalize_ris_text(_load_ris_text_file()) if include_ris else ''
                 customer_in_person_raw = (cd.get('customer_in_person') or '').strip()
@@ -1615,6 +1676,7 @@ def contract_form_view(request, tkp_id):
                     'period_starts_from': (cd.get('period_starts_from') or '').strip(),
                     'price': _format_price(price_val),
                     'payment_terms': payment_terms,
+                    'usl': payment_terms,
                     'ris': ris_text,
                     'ris_head': RIS_HEAD_TEXT if include_ris else '',
                     'name': cd.get('name') or cp.name or '',
@@ -1629,6 +1691,8 @@ def contract_form_view(request, tkp_id):
                     'email': cd.get('email') or cp.email or '',
                     'room': cd.get('room') or tkp.room or '',
                     's': cd.get('s') or tkp.s or '',
+                    'text': (tkp.text or '').strip(),
+                    **contract_template_extras_for_ctx(cd, contract_template_file),
                 }
                 doc = DocxTemplate(str(template_path))
                 doc.render(ctx)
@@ -1687,6 +1751,15 @@ def contract_form_view(request, tkp_id):
     else:
         form = ContractForm(initial=initial)
 
+    show_nav_contract_fields = False
+    if is_complex_contract:
+        if request.method == 'POST':
+            show_nav_contract_fields = (
+                (request.POST.get('complex_contract_type') or '').strip() == COMPLEX_CONTRACT_TEMPLATE_03
+            )
+        else:
+            show_nav_contract_fields = initial.get('complex_contract_type') == COMPLEX_CONTRACT_TEMPLATE_03
+
     counterparty_display_name = ''
     if request.method != 'POST' and cp_for_initial:
         counterparty_display_name = cp_for_initial.name or ''
@@ -1704,6 +1777,8 @@ def contract_form_view(request, tkp_id):
         'contract_draft_id': contract_draft_id,
         'counterparty_display_name': counterparty_display_name,
         'is_complex_contract': is_complex_contract,
+        'show_nav_contract_fields': show_nav_contract_fields,
+        'nav_contract_template_filename': COMPLEX_CONTRACT_TEMPLATE_03,
     })
 
 
@@ -1818,7 +1893,7 @@ def contract_save_from_editor_view(request):
     except Exception as e:
         messages.error(request, f'Не удалось сформировать DOCX из текста: {e}. Установите Pandoc (https://pandoc.org).')
         return redirect('proposals:contract_editor')
-    if template_filename in ('05_Договор_Контент_Навигация.docx', '08_Договор_ДПФ_Благоустройство.docx') and tkp.rows_json:
+    if template_filename in COMPLEX_CONTRACTS_WITH_SPEC_TABLE and tkp.rows_json:
         rows_ctx, total_fmt = _complex_rows_json_to_ctx(tkp.rows_json)
         table_doc = _build_complex_table_document(rows_ctx, total_fmt)
         _insert_table_into_docx(str(docx_path), table_doc, CONTRACT_SPEC_TABLE_PLACEHOLDER)
@@ -2278,6 +2353,9 @@ def contract_card_view(request, contract_id):
         'customer_represented_by_nominative': snapshot.get('customer_represented_by_nominative') or (_cp.director if _cp else ''),
         'price': snapshot.get('price') or _format_price(contract.sum_total),
         'payment_terms': snapshot.get('payment_terms') or '',
+        'usl': snapshot.get('usl') or snapshot.get('payment_terms') or '',
+        'poryadok': snapshot.get('poryadok') or '',
+        'dney': snapshot.get('dney') or '',
         'name': snapshot.get('name') or (_cp.name if _cp else ''),
         'address': snapshot.get('address') or (_cp.address if _cp else ''),
         'inn': snapshot.get('inn') or (_cp.inn if _cp else ''),
@@ -2290,6 +2368,7 @@ def contract_card_view(request, contract_id):
         'email': snapshot.get('email') or (_cp.email if _cp else ''),
         'room': snapshot.get('room') or '',
         's': snapshot.get('s') or '',
+        'text': snapshot.get('text') or '',
     }
     return render(request, 'proposals/contract_card_content.html', ctx)
 

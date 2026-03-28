@@ -78,7 +78,15 @@ export default function App() {
   });
   const [complex, setComplex] = useState({ date: "", client: "", region_name: "", room: "", srok: "", text1: "", rows: [] });
   const [req, setReq] = useState({ name: "", inn: "", kpp: "", address: "", director: "", ogrn: "", account: "", bank: "", bik: "", kor_account: "", phone: "", email: "" });
-  const [contract, setContract] = useState({ tkp_id: "", counterparty: "", date: "", price: "", payment_terms: "", include_ris: true, customer_name: "" });
+  const [contract, setContract] = useState({
+    tkp_id: "",
+    counterparty: "",
+    date: "",
+    price: "",
+    payment_terms: "2",
+    include_ris: true,
+    customer_name: "",
+  });
   const [reqFile, setReqFile] = useState(null);
 
   useEffect(() => {
@@ -382,7 +390,41 @@ export default function App() {
             <input placeholder="Заказчик (customer_name)" value={contract.customer_name} onChange={(e) => setContract({ ...contract, customer_name: e.target.value })} />
             <input type="date" value={contract.date} onChange={(e) => setContract({ ...contract, date: e.target.value })} />
             <input placeholder="Цена" value={contract.price} onChange={(e) => setContract({ ...contract, price: e.target.value })} />
-            <Textarea rows={3} placeholder="Условия оплаты" value={contract.payment_terms || ""} onChange={(e) => setContract({ ...contract, payment_terms: e.target.value })} />
+            <div style={{ margin: "8px 0 4px", fontWeight: 600 }}>Условия оплаты</div>
+            <label style={{ display: "block", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 12px", marginBottom: 8, cursor: "pointer", background: contract.payment_terms === "1" ? "#f5f3ff" : "#fff" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <input
+                  type="radio"
+                  name="pay_terms"
+                  checked={contract.payment_terms === "1"}
+                  onChange={() => setContract({ ...contract, payment_terms: "1" })}
+                  style={{ marginTop: 4, width: "auto" }}
+                />
+                <span>
+                  <strong style={{ display: "block", marginBottom: 4 }}>Вариант 1</strong>
+                  <span style={{ fontSize: 13, lineHeight: 1.35, color: "#475569" }}>
+                    2.2. Расчеты по Договору производятся на основании выставленного Исполнителем счета не позднее 10 рабочих дней с даты подписания Заказчиком товарной накладной/универсального передаточного документа (УПД).
+                  </span>
+                </span>
+              </div>
+            </label>
+            <label style={{ display: "block", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 12px", marginBottom: 8, cursor: "pointer", background: contract.payment_terms === "2" ? "#f5f3ff" : "#fff" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <input
+                  type="radio"
+                  name="pay_terms"
+                  checked={contract.payment_terms === "2"}
+                  onChange={() => setContract({ ...contract, payment_terms: "2" })}
+                  style={{ marginTop: 4, width: "auto" }}
+                />
+                <span>
+                  <strong style={{ display: "block", marginBottom: 4 }}>Вариант 2</strong>
+                  <span style={{ fontSize: 13, lineHeight: 1.35, color: "#475569" }}>
+                    2.2. Оплата по договору производится в следующем порядке: 2.2.1. В течение 5 рабочих дней на основании выставленного Исполнителем счета Заказчик выплачивает Исполнителю аванс в размере 30% от цены Договора; 2.2.2. В течение 5 рабочих дней с даты подписания товарной накладной/универсального передаточного документа (УПД) Заказчик выплачивает Исполнителю оставшиеся 70% цены Договора.
+                  </span>
+                </span>
+              </div>
+            </label>
             <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "4px 0 8px" }}>
               <input
                 type="checkbox"
