@@ -74,7 +74,8 @@ class ProposalForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['service'].queryset = Service.objects.all()
+        # В форме ТКП на одну услугу не показываем услугу "Навигация_стенды"
+        self.fields['service'].queryset = Service.objects.exclude(name='Навигация_стенды')
         self.fields['region'].queryset = Region.objects.all()
 
     def clean(self):
