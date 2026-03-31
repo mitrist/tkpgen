@@ -378,6 +378,9 @@
         .then(function(data) {
           const selService = form.querySelector('select[name="service_id"]');
           data.services.forEach(function(s) {
+            // Не показываем услугу "Навигация_стенды" в окне формирования ТКП
+            // (оставляем backend-логику без изменений).
+            if (s && s.name === 'Навигация_стенды') return;
             const opt = document.createElement('option');
             opt.value = s.id;
             opt.textContent = s.name;
