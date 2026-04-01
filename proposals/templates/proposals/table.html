@@ -5,50 +5,6 @@
 {% block content %}
 <div style="overflow-x: auto;">
 <h1>Реестр ТКП</h1>
-<form method="get" action="{% url 'proposals:table' %}" class="summary" style="margin-bottom: 1rem;">
-    <p style="margin: 0 0 0.5rem; font-weight: 600; font-size: 0.9rem;">Фильтры по столбцам</p>
-    <table class="table-filters" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-        <tr>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
-                <label for="id_date_from" style="font-size: 0.75rem;">Дата с</label>
-                <input type="date" name="date_from" id="id_date_from" value="{{ filters.date_from }}" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem;">
-            </td>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
-                <label for="id_date_to" style="font-size: 0.75rem;">Дата по</label>
-                <input type="date" name="date_to" id="id_date_to" value="{{ filters.date_to }}" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem;">
-            </td>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
-                <label for="id_number" style="font-size: 0.75rem;">Номер</label>
-                <input type="text" name="number" id="id_number" value="{{ filters.number }}" placeholder="часть номера" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
-            </td>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
-                <label for="id_client" style="font-size: 0.75rem;">Клиент</label>
-                <input type="text" name="client" id="id_client" value="{{ filters.client }}" placeholder="часть названия" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
-            </td>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
-                <label for="id_service" style="font-size: 0.75rem;">Услуга</label>
-                <select name="service" id="id_service" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
-                    <option value="">Все</option>
-                    {% for sv in services_list %}
-                    <option value="{{ sv }}" {% if filters.service == sv %}selected{% endif %}>{{ sv }}</option>
-                    {% endfor %}
-                </select>
-            </td>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
-                <label for="id_sum_min" style="font-size: 0.75rem;">Сумма от</label>
-                <input type="text" name="sum_min" id="id_sum_min" value="{{ filters.sum_min }}" placeholder="мин" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
-            </td>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom;">
-                <label for="id_sum_max" style="font-size: 0.75rem;">Сумма до</label>
-                <input type="text" name="sum_max" id="id_sum_max" value="{{ filters.sum_max }}" placeholder="макс" style="margin: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; width: 100%;">
-            </td>
-            <td style="padding: 0.25rem 0.35rem; vertical-align: bottom; white-space: nowrap;">
-                <button type="submit" class="btn btn-sm">Применить</button>
-                <a href="{% url 'proposals:table' %}" class="btn btn-secondary btn-sm" style="margin-left: 0.2rem;">Сбросить</a>
-            </td>
-        </tr>
-    </table>
-</form>
 <form id="bulk-form-tkp" method="post" action="{% url 'proposals:table' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">
 {% csrf_token %}
 <div class="bulk-toolbar" style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
@@ -59,16 +15,15 @@
     <thead>
         <tr style="border-bottom: 2px solid var(--border);">
             <th style="text-align: center; padding: 0.4rem 0.5rem; width: 2.5rem;"><input type="checkbox" id="tkp-select-all" title="Выбрать все" aria-label="Выбрать все"></th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Дата</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Номер документа</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Клиент</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Услуга</th>
-            <th style="text-align: right; padding: 0.4rem 0.5rem;">Сумма</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Статус</th>
-            <th style="text-align: left; padding: 0.4rem 0.5rem;">Владелец</th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?sort=date&amp;order={% if sort == 'date' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Дата {% if sort == 'date' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?sort=number&amp;order={% if sort == 'number' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Номер документа {% if sort == 'number' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?sort=client&amp;order={% if sort == 'client' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Клиент {% if sort == 'client' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?sort=service&amp;order={% if sort == 'service' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Услуга {% if sort == 'service' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: right; padding: 0.4rem 0.5rem;"><a href="?sort=sum_total&amp;order={% if sort == 'sum_total' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Сумма {% if sort == 'sum_total' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?sort=status&amp;order={% if sort == 'status' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Статус {% if sort == 'status' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
+            <th style="text-align: left; padding: 0.4rem 0.5rem;"><a href="?sort=owner&amp;order={% if sort == 'owner' and order == 'asc' %}desc{% else %}asc{% endif %}" class="th-sort">Владелец {% if sort == 'owner' %}{% if order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}</a></th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Файлы</th>
             <th style="text-align: left; padding: 0.4rem 0.5rem;">Договор</th>
-            <th style="text-align: center; padding: 0.4rem 0.5rem; width: 5rem;">Удалить</th>
         </tr>
     </thead>
     <tbody>
@@ -78,10 +33,16 @@
             <td style="padding: 0.4rem 0.5rem; text-align: center;"><input type="checkbox" name="ids" value="{{ r.pk }}" form="bulk-form-tkp" class="tkp-row-cb"></td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.date|date:"d.m.Y" }}</td>
             <td style="padding: 0.4rem 0.5rem;">
+                <span style="display: inline-flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                    <span>{{ r.number }}</span>
+                    <a href="#" class="table-tkp-card-link" data-tkp-card="{% url 'proposals:tkp_card' r.pk %}" title="Реквизиты ТКП" aria-label="Реквизиты ТКП">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </a>
+                </span>
                 {% if r.status == 'draft' %}
-                <a href="{% if r.service == 'Комплексное ТКП' %}{% url 'proposals:complex_form' %}?draft_id={{ r.pk }}{% else %}{% url 'proposals:form' %}?draft_id={{ r.pk }}{% endif %}">{{ r.number }}</a>
-                {% else %}
-                {{ r.number }}
+                <span style="margin-left: 0.35rem; font-size: 0.75rem; white-space: nowrap;">
+                    (<a href="{% if r.service == 'Комплексное ТКП' %}{% url 'proposals:complex_form' %}?draft_id={{ r.pk }}{% elif r.service == 'Универсальное ТКП' %}{% url 'proposals:universal_form' %}?draft_id={{ r.pk }}{% else %}{% url 'proposals:form' %}?draft_id={{ r.pk }}{% endif %}">редактировать</a>)
+                </span>
                 {% endif %}
             </td>
             <td style="padding: 0.4rem 0.5rem;">{{ r.client|default:"—" }}</td>
@@ -96,14 +57,16 @@
                 {% endif %}
             </td>
             <td style="padding: 0.4rem 0.5rem;">
-                {% if r.status == 'draft' %}
-                {% if r.pk in contract_template_by_tkp or r.service in contract_template_by_service %}
-                <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract" class="btn btn-sm">Сформировать Договор</a>
-                {% else %}—{% endif %}
-                {% elif contract_for_row %}
+                {% if contract_for_row %}
                 <a href="#" class="btn btn-sm btn-contract-done" data-contract-card="{% url 'proposals:contract_card' contract_for_row.pk %}">Договор сформирован</a>
                 {% elif contract_draft_for_row %}
                 <a href="{% url 'proposals:contract_form' r.pk %}?contract_draft_id={{ contract_draft_for_row.pk }}" class="btn btn-sm btn-contract-draft">Сохранен черновик договора</a>
+                {% elif r.service == 'Универсальное ТКП' %}
+                <span class="tkp-contract-badge-dash" title="Договор не формируется">—</span>
+                {% elif r.status == 'draft' %}
+                {% if r.pk in contract_template_by_tkp or r.service in contract_template_by_service %}
+                <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract" class="btn btn-sm">Сформировать Договор</a>
+                {% else %}—{% endif %}
                 {% elif r.service in contract_template_by_service %}
                 <a href="{% url 'proposals:requisites_add' %}?tkp_id={{ r.pk }}&from=contract" class="btn btn-sm">Сформировать Договор</a>
                 {% elif r.pk in contract_template_by_tkp %}
@@ -112,18 +75,11 @@
                 —
                 {% endif %}
             </td>
-            <td style="padding: 0.4rem 0.5rem; text-align: center;">
-                <form method="post" action="{% url 'proposals:table' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Удалить эту запись и файлы ТКП?');">
-                    {% csrf_token %}
-                    <input type="hidden" name="delete_id" value="{{ r.pk }}">
-                    <button type="submit" class="btn btn-secondary btn-sm">Удалить</button>
-                </form>
-            </td>
         </tr>
         {% endwith %}
         {% empty %}
         <tr>
-            <td colspan="11" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
+            <td colspan="10" style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8125rem;">Нет сформированных ТКП</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -141,6 +97,15 @@
 <p style="margin-top: 1.5rem;">
     <a href="{% url 'proposals:form' %}" class="btn">Формирование ТКП</a>
 </p>
+<div id="tkp-detail-modal" class="modal-overlay tkp-detail-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-box tkp-detail-modal-box" style="border-radius: 8px; max-height: 90vh; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.25); max-width: min(52rem, 96vw); width: 100%; border: 1px solid #e5e7eb; background: #f9fafb; color: #1f2937;">
+        <div class="modal-header tkp-detail-header" style="padding: 0.65rem 1rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #fff;">
+            <span style="font-weight: 600; font-size: 0.9rem; color: #1f2937;">Реквизиты ТКП</span>
+            <button type="button" class="btn btn-secondary btn-sm tkp-modal-close" aria-label="Закрыть">Закрыть</button>
+        </div>
+        <div class="modal-body tkp-detail-modal-body" style="padding: 1rem 1.25rem; background: #f9fafb; color: #1f2937;"></div>
+    </div>
+</div>
 <div id="contract-card-modal" class="modal-overlay contract-card-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
     <div class="modal-box contract-card-modal-box" style="border-radius: 10px; max-height: 90vh; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
         <div class="modal-header" style="padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.2); display: flex; justify-content: space-between; align-items: center;">
@@ -160,6 +125,28 @@
 .btn-sm { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
 .table-file-link { margin-right: 0.5rem; }
 .table-file-link:last-of-type { margin-right: 0; }
+.table-tkp-card-link { display: inline-flex; align-items: center; color: #2563eb; text-decoration: none; line-height: 1; vertical-align: middle; }
+.table-tkp-card-link:hover { color: #1d4ed8; }
+.table-tkp-card-link:focus { outline: 2px solid #93c5fd; outline-offset: 2px; border-radius: 2px; }
+.tkp-detail-modal-body { color: #1f2937; }
+.tkp-detail-modal-body .tkp-card-content { color: #1f2937; }
+.th-sort { color: inherit; text-decoration: none; }
+.th-sort:hover { text-decoration: underline; }
+.tkp-contract-badge-dash {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 7.5rem;
+    min-height: 2rem;
+    padding: 0.35rem 0.75rem;
+    background: #fff;
+    color: #1f2937;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-sizing: border-box;
+}
 .tkp-row-draft { background-color: #fffde7; }
 .tkp-row-with-contract { background-color: #e8f5e9; }
 .btn-contract-done { background-color: #2e7d32; color: #fff; border-color: #2e7d32; }
@@ -167,15 +154,38 @@
 .btn-contract-draft { background-color: #6b7280; color: #fff; border-color: #6b7280; }
 .btn-contract-draft:hover { background-color: #4b5563; color: #fff; }
 @media (max-width: 992px) {
-    .table-filters { display: block; }
-    .table-filters tr { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .table-filters td { display: block; flex: 1 1 140px; min-width: 0; }
-    .table-filters td:last-child { flex: 1 1 100%; }
     .table-tkp-list { font-size: 0.75rem; }
     .table-tkp-list th, .table-tkp-list td { padding: 0.35rem 0.4rem; }
 }
 </style>
 <script>
+(function() {
+    var tkpModal = document.getElementById('tkp-detail-modal');
+    var tkpBody = tkpModal && tkpModal.querySelector('.tkp-detail-modal-body');
+    var tkpCloseBtns = tkpModal ? tkpModal.querySelectorAll('.tkp-modal-close') : [];
+    function showTkpModal(html) {
+        if (tkpBody) tkpBody.innerHTML = html;
+        if (tkpModal) tkpModal.style.display = 'flex';
+    }
+    function hideTkpModal() {
+        if (tkpModal) tkpModal.style.display = 'none';
+    }
+    if (tkpModal) {
+        tkpModal.addEventListener('click', function(e) {
+            if (e.target === tkpModal) hideTkpModal();
+        });
+    }
+    tkpCloseBtns.forEach(function(b) { b.addEventListener('click', hideTkpModal); });
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest && e.target.closest('.table-tkp-card-link');
+        if (!link || !link.dataset.tkpCard) return;
+        e.preventDefault();
+        fetch(link.dataset.tkpCard)
+            .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+            .then(showTkpModal)
+            .catch(function() { showTkpModal('<p style="color:#1f2937;margin:0;">Не удалось загрузить данные ТКП.</p>'); });
+    });
+})();
 (function() {
     var modal = document.getElementById('contract-card-modal');
     var body = modal && modal.querySelector('.modal-body');

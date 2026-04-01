@@ -4,20 +4,26 @@ Django settings for tkp_generator project.
 import os
 from pathlib import Path
 
-# Загрузка .env (упрощённо, без python-dotenv)
-def _env(key, default=None):
-    return os.environ.get(key, default)
-
-SECRET_KEY = _env('SECRET_KEY', 'change-me-in-production')
-DEBUG = _env('DEBUG', 'False').lower() == 'true'
-ALLOWED_HOSTS = _env('ALLOWED_HOSTS', 'localhost').split(',')
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def _env(key, default=None):
     """Значение из переменных окружения."""
     return os.environ.get(key, default)
+
+
+def _path_from_env(key: str, default: Path) -> Path:
+    """
+    Абсолютный путь из окружения или default.
+    Относительный путь в переменной считается от BASE_DIR (удобно для локальной разработки).
+    """
+    raw = _env(key)
+    if not raw or not str(raw).strip():
+        return default
+    p = Path(str(raw).strip()).expanduser()
+    if not p.is_absolute():
+        p = (BASE_DIR / p).resolve()
+    return p
 
 
 SECRET_KEY = _env('SECRET_KEY', 'django-insecure-tkp-gen-dev-key-change-in-production')
@@ -64,10 +70,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'tkp_generator.wsgi.application'
 
+# БД и сгенерированные PDF/DOCX можно вынести в постоянный каталог вне дерева git (см. DEPLOY.md)
+SQLITE_DB_PATH = _path_from_env('SQLITE_DB_PATH', BASE_DIR / 'db.sqlite3')
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': SQLITE_DB_PATH,
     }
 }
 
@@ -99,8 +107,12 @@ LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 # Папка с шаблонами .docx
 TEMPLATES_DOCX_DIR = BASE_DIR / 'templates_docx'
-# Папка для сформированных PDF и DOCX (скачивание)
-TKP_OUTPUT_DIR = BASE_DIR / 'TKP_output'
+# Папка для сформированных PDF и DOCX (ТКП и договоры); переопределяется TKP_OUTPUT_DIR в .env
+TKP_OUTPUT_DIR = _path_from_env('TKP_OUTPUT_DIR', BASE_DIR / 'TKP_output')
+
+# Гарантируем наличие каталогов (удобно при первом запуске с путями в /var/lib/...)
+Path(SQLITE_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+Path(TKP_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.yandex.ru'

@@ -1,0 +1,82 @@
+<div class="tkp-card-content" style="max-height: 80vh; overflow-y: auto; font-size: 0.8125rem; color: #1f2937; background: #f9fafb;">
+    <h2 style="font-size: 1rem; margin: 0 0 0.75rem; font-weight: 600; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; color: #111827;">ТКП {{ tkp.number }}</h2>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 1rem;">
+        <tbody>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; width: 11rem; vertical-align: top;">Дата</td>
+                <td style="padding: 0.35rem 0; color: #1f2937;">{{ date_display }}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Клиент</td>
+                <td style="padding: 0.35rem 0; color: #1f2937;">{{ tkp.client|default:"—" }}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Услуга / тип ТКП</td>
+                <td style="padding: 0.35rem 0; color: #1f2937;">{{ tkp.service }}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Сумма</td>
+                <td style="padding: 0.35rem 0; color: #1f2937;">{{ sum_display }} ₽</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Статус</td>
+                <td style="padding: 0.35rem 0; color: #1f2937;">{{ status_display }}</td>
+            </tr>
+            {% if owner_display %}
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Владелец</td>
+                <td style="padding: 0.35rem 0; color: #1f2937;">{{ owner_display }}</td>
+            </tr>
+            {% endif %}
+            {% if tkp.room %}
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Параметры объекта</td>
+                <td style="padding: 0.35rem 0; white-space: pre-wrap; color: #1f2937;">{{ tkp.room }}</td>
+            </tr>
+            {% endif %}
+            {% if tkp.s %}
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Площадь / количество</td>
+                <td style="padding: 0.35rem 0; color: #1f2937;">{{ tkp.s }}</td>
+            </tr>
+            {% endif %}
+            {% if tkp.text %}
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.35rem 0.5rem 0.35rem 0; color: #6b7280; vertical-align: top;">Доп. текст</td>
+                <td style="padding: 0.35rem 0; white-space: pre-wrap; color: #1f2937;">{{ tkp.text }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    {% if has_rows %}
+    <p style="margin: 0 0 0.5rem; font-weight: 600; font-size: 0.8125rem; color: #111827;">Позиции ТКП</p>
+    <div style="overflow-x: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+                <tr style="border-bottom: 2px solid #e5e7eb; background: #f3f4f6;">
+                    <th style="text-align: left; padding: 0.4rem 0.5rem; color: #374151; font-weight: 600;">№</th>
+                    <th style="text-align: left; padding: 0.4rem 0.5rem; color: #374151; font-weight: 600;">Компонент услуги</th>
+                    <th style="text-align: left; padding: 0.4rem 0.5rem; color: #374151; font-weight: 600;">Комментарий</th>
+                    <th style="text-align: left; padding: 0.4rem 0.5rem; color: #374151; font-weight: 600;">Ед. изм.</th>
+                    <th style="text-align: right; padding: 0.4rem 0.5rem; color: #374151; font-weight: 600;">Кол-во</th>
+                    <th style="text-align: right; padding: 0.4rem 0.5rem; color: #374151; font-weight: 600;">Цена за ед.</th>
+                    <th style="text-align: right; padding: 0.4rem 0.5rem; color: #374151; font-weight: 600;">Сумма</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows_display %}
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 0.4rem 0.5rem; vertical-align: top; color: #1f2937;">{{ row.num }}</td>
+                    <td style="padding: 0.4rem 0.5rem; vertical-align: top; color: #1f2937;">{{ row.service_name }}</td>
+                    <td style="padding: 0.4rem 0.5rem; vertical-align: top; white-space: pre-wrap; color: #1f2937;">{{ row.comment|default:"" }}</td>
+                    <td style="padding: 0.4rem 0.5rem; vertical-align: top; color: #1f2937;">{{ row.unit_display }}</td>
+                    <td style="padding: 0.4rem 0.5rem; text-align: right; vertical-align: top; color: #1f2937;">{{ row.quantity }}</td>
+                    <td style="padding: 0.4rem 0.5rem; text-align: right; vertical-align: top; color: #1f2937;">{{ row.price_per_unit }} ₽</td>
+                    <td style="padding: 0.4rem 0.5rem; text-align: right; vertical-align: top; color: #1f2937;">{{ row.total }} ₽</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>

@@ -50,6 +50,8 @@ from .models import (
 from .requisites_parser import FIELD_ORDER, parse_requisites_file
 
 COMPLEX_TEMPLATE_NAME = 'Шаблон 9 Комплексное ТКП.docx'
+# Значение поля TKPRecord.service для универсального ТКП (без договора; тот же шаблон DOCX, что у комплексного)
+UNIVERSAL_TKP_SERVICE = 'Универсальное ТКП'
 UNIT_DISPLAY = {'m2': 'м²', 'piece': 'шт'}
 
 # Подпапка с шаблонами договоров (внутри TEMPLATES_DOCX_DIR)
@@ -948,6 +950,213 @@ def complex_confirm_view(request):
     return render(request, 'proposals/complex_confirm.html', context)
 
 
+@login_required
+@require_http_methods(['GET', 'POST'])
+def universal_form_view(request):
+    """Форма универсального ТКП: как комплексное, но договор не формируется; любой набор услуг в строках."""
+    if request.method == 'POST':
+        form = ComplexProposalForm(request.POST)
+        rows_data = request.POST.get('rows_json', '')
+        rows, row_error = _parse_complex_rows(rows_data)
+        save_draft = request.POST.get('save_draft')
+
+        if save_draft:
+            draft_errors = []
+            date_val = form.data.get('date')
+            if not date_val:
+                draft_errors.append('Укажите дату.')
+            else:
+                try:
+                    datetime.strptime(date_val, '%Y-%m-%d')
+                except ValueError:
+                    draft_errors.append('Некорректная дата.')
+            region_id = form.data.get('region')
+            region = None
+            if region_id:
+                try:
+                    region = Region.objects.get(pk=region_id)
+                except (Region.DoesNotExist, ValueError):
+                    pass
+            if not region:
+                draft_errors.append('Выберите регион.')
+
+            if not draft_errors and region:
+                date_str = date_val
+                client_val = (form.data.get('client') or '').strip()
+                room_val = (form.data.get('room') or '').strip()
+                text1_val = (form.data.get('text1') or '').strip()
+                rows_serializable = []
+                if not row_error and rows:
+                    rows_serializable = [
+                        {
+                            'service_name': r['service_name'],
+                            'comment': r.get('comment', ''),
+                            'srok': r.get('srok', ''),
+                            'unit': r['unit'],
+                            'quantity': str(r['quantity']),
+                            'price_per_unit': str(r['price_per_unit']),
+                            'total': str(r['total']),
+                        }
+                        for r in rows
+                    ]
+                data = {
+                    'date': date_str,
+                    'client': client_val,
+                    'region_id': region.pk,
+                    'region_name': region.name,
+                    'room': room_val,
+                    'rows': rows_serializable,
+                    'text1': text1_val,
+                }
+                request.session['universal_proposal_data'] = data
+                _save_complex_tkp_record(
+                    data, status=TKPRecord.STATUS_DRAFT, user=request.user, service_name=UNIVERSAL_TKP_SERVICE
+                )
+                messages.success(request, 'Черновик универсального ТКП сохранён в перечень.')
+                return redirect('proposals:table')
+            for err in draft_errors:
+                messages.error(request, err)
+        elif form.is_valid() and not row_error:
+            rows_serializable = [
+                {
+                    'service_name': r['service_name'],
+                    'comment': r.get('comment', ''),
+                    'srok': r.get('srok', ''),
+                    'unit': r['unit'],
+                    'quantity': str(r['quantity']),
+                    'price_per_unit': str(r['price_per_unit']),
+                    'total': str(r['total']),
+                }
+                for r in rows
+            ]
+            region = form.cleaned_data['region']
+            data = {
+                'date': form.cleaned_data['date'].strftime('%Y-%m-%d'),
+                'client': (form.cleaned_data['client'] or '').strip(),
+                'region_id': region.pk,
+                'region_name': region.name,
+                'room': (form.cleaned_data.get('room') or '').strip(),
+                'rows': rows_serializable,
+                'text1': (form.cleaned_data.get('text1') or '').strip(),
+            }
+            request.session['universal_proposal_data'] = data
+            return redirect('proposals:universal_confirm')
+        if row_error and not save_draft:
+            messages.error(request, row_error)
+    else:
+        draft_id = request.GET.get('draft_id')
+        initial = None
+        if draft_id:
+            try:
+                draft = TKPRecord.objects.get(pk=draft_id, status=TKPRecord.STATUS_DRAFT)
+                if draft.service == UNIVERSAL_TKP_SERVICE:
+                    initial = {
+                        'date': draft.date,
+                        'client': draft.client or '',
+                        'room': draft.room or '',
+                        'text1': draft.text or '',
+                    }
+                    request.session['universal_draft_id'] = int(draft_id)
+            except (TKPRecord.DoesNotExist, ValueError, TypeError):
+                request.session.pop('universal_draft_id', None)
+        else:
+            request.session.pop('universal_draft_id', None)
+        form = ComplexProposalForm(initial=initial) if initial else ComplexProposalForm()
+    services_raw = list(Service.objects.order_by('order', 'name').values('id', 'name', 'unit_type', 'description'))
+    services = []
+    file_comments = _load_complex_service_comments_file()
+    for s in services_raw:
+        name = s['name']
+        display_name = COMPLEX_SERVICE_DISPLAY_NAMES.get(name, name)
+        saved_desc = (s.get('description') or '').strip()
+        default_comment = (
+            saved_desc
+            or file_comments.get(name, '')
+            or COMPLEX_SERVICE_DEFAULT_COMMENTS.get(name, '')
+        )
+        services.append({
+            'id': s['id'],
+            'name': name,
+            'display_name': display_name,
+            'unit_type': s['unit_type'],
+            'default_comment': default_comment,
+        })
+    prices_qs = RegionServicePrice.objects.select_related('region', 'service').all()
+    region_prices = {}
+    for rsp in prices_qs:
+        rid, sid = str(rsp.region_id), str(rsp.service_id)
+        if rid not in region_prices:
+            region_prices[rid] = {}
+        region_prices[rid][sid] = str(rsp.unit_price)
+    service_comments = {str(s['id']): s['default_comment'] for s in services}
+    context = {
+        'form': form,
+        'services': services,
+        'srok_choices': SROK_CHOICES,
+        'services_json': json.dumps(services, ensure_ascii=False),
+        'region_prices_json': json.dumps(region_prices, ensure_ascii=False),
+        'service_comments_json': json.dumps(service_comments, ensure_ascii=False),
+    }
+    return render(request, 'proposals/universal_form.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def universal_confirm_view(request):
+    """Подтверждение универсального ТКП и генерация docx/pdf (тот же шаблон, что у комплексного)."""
+    data = request.session.get('universal_proposal_data')
+    if not data:
+        return redirect('proposals:universal_form')
+
+    if request.method == 'POST':
+        if request.POST.get('save_draft'):
+            _save_complex_tkp_record(data, status=TKPRecord.STATUS_DRAFT, user=request.user, service_name=UNIVERSAL_TKP_SERVICE)
+            messages.success(request, 'Черновик универсального ТКП сохранён в перечень.')
+            return redirect('proposals:table')
+        try:
+            base_name = _generate_complex_and_save_files(data)
+        except Exception as e:
+            messages.error(request, f'Ошибка генерации: {e}')
+            return redirect('proposals:universal_confirm')
+        if base_name:
+            _save_complex_tkp_record(data, user=request.user, service_name=UNIVERSAL_TKP_SERVICE)
+            draft_id = request.session.pop('universal_draft_id', None)
+            if draft_id:
+                TKPRecord.objects.filter(pk=draft_id).delete()
+            request.session['tkp_download_base'] = base_name
+            return redirect('proposals:download_success')
+        messages.error(request, 'Ошибка генерации. Проверьте шаблон в templates_docx/')
+        return redirect('proposals:universal_confirm')
+
+    date_display = datetime.strptime(data['date'], '%Y-%m-%d').strftime('%d.%m.%Y')
+    total_sum = sum(Decimal(str(r['total'])) for r in data['rows'])
+    rows_display = []
+    for i, r in enumerate(data['rows'], 1):
+        comment = (r.get('comment') or '').replace(COMPLEX_COMMENT_LINE_BREAK_MARKER, '\n')
+        srok = r.get('srok', '')
+        if srok:
+            comment = comment.rstrip() + '\nСрок разработки - ' + srok
+        rows_display.append({
+            'num': i,
+            'service_name': r['service_name'],
+            'comment': comment,
+            'unit_display': UNIT_DISPLAY.get(r['unit'], r['unit']),
+            'quantity': r['quantity'],
+            'price_per_unit': r['price_per_unit'],
+            'total': _format_price(Decimal(str(r['total']))),
+        })
+    context = {
+        'date': date_display,
+        'client': data['client'],
+        'region_name': data.get('region_name', ''),
+        'room': data.get('room', ''),
+        'rows': rows_display,
+        'total_sum': _format_price(total_sum),
+        'text1': data.get('text1', ''),
+    }
+    return render(request, 'proposals/universal_confirm.html', context)
+
+
 TKP_TABLE_PLACEHOLDER = '___TKP_TABLE_INSERT___'
 
 
@@ -1172,8 +1381,8 @@ def _serialize_complex_rows_for_storage(rows):
     ]
 
 
-def _save_complex_tkp_record(data, status=None, user=None):
-    """Сохранение записи о сформированном комплексном ТКП (status по умолчанию — итоговый)."""
+def _save_complex_tkp_record(data, status=None, user=None, service_name='Комплексное ТКП'):
+    """Сохранение записи о сформированном комплексном или универсальном ТКП (status по умолчанию — итоговый)."""
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
     rows = data.get('rows', [])
     total_sum = sum(Decimal(str(r['total'])) for r in rows)
@@ -1188,7 +1397,7 @@ def _save_complex_tkp_record(data, status=None, user=None):
         date=date_obj,
         number=number,
         client=data.get('client') or '',
-        service='Комплексное ТКП',
+        service=service_name,
         sum_total=total_sum,
         room=data.get('room') or '',
         s='',
@@ -1214,7 +1423,7 @@ def _delete_tkp_files(base_name):
 @login_required
 @require_http_methods(['GET', 'POST'])
 def table_view(request):
-    """Страница перечня сформированных ТКП с фильтрами по каждому столбцу; удаление записей."""
+    """Страница перечня сформированных ТКП с сортировкой по столбцам; массовое удаление и копирование."""
     if request.method == 'POST':
         q = request.GET.urlencode()
         url = reverse('proposals:table') + ('?' + q if q else '')
@@ -1268,54 +1477,29 @@ def table_view(request):
                 messages.success(request, f'Скопировано записей: {copied}.')
             return redirect(url)
 
-        delete_id = request.POST.get('delete_id', '').strip()
-        if delete_id:
-            try:
-                rec = TKPRecord.objects.get(pk=delete_id)
-                base_name = rec.number
-                rec.delete()
-                _delete_tkp_files(base_name)
-                messages.success(request, 'Запись удалена.')
-            except TKPRecord.DoesNotExist:
-                messages.error(request, 'Запись не найдена.')
-            return redirect(url)
     records = TKPRecord.objects.select_related('created_by').all()
-    date_from = request.GET.get('date_from', '').strip()
-    date_to = request.GET.get('date_to', '').strip()
-    number = request.GET.get('number', '').strip()
-    client = request.GET.get('client', '').strip()
-    service = request.GET.get('service', '').strip()
-    sum_min = request.GET.get('sum_min', '').strip()
-    sum_max = request.GET.get('sum_max', '').strip()
-    if date_from:
-        try:
-            d = datetime.strptime(date_from, '%Y-%m-%d').date()
-            records = records.filter(date__gte=d)
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            d = datetime.strptime(date_to, '%Y-%m-%d').date()
-            records = records.filter(date__lte=d)
-        except ValueError:
-            pass
-    if number:
-        records = records.filter(number__icontains=number)
-    if client:
-        records = records.filter(client__icontains=client)
-    if service:
-        records = records.filter(service=service)
-    if sum_min:
-        try:
-            records = records.filter(sum_total__gte=Decimal(sum_min.replace(',', '.')))
-        except (ValueError, Exception):
-            pass
-    if sum_max:
-        try:
-            records = records.filter(sum_total__lte=Decimal(sum_max.replace(',', '.')))
-        except (ValueError, Exception):
-            pass
-    services = list(TKPRecord.objects.values_list('service', flat=True).distinct().order_by('service'))
+    sort_col = request.GET.get('sort', '').strip().lower()
+    order = request.GET.get('order', 'desc').strip().lower()
+    if order not in ('asc', 'desc'):
+        order = 'desc'
+    order_prefix = '' if order == 'asc' else '-'
+    allowed_sort = {
+        'date': 'date',
+        'number': 'number',
+        'client': 'client',
+        'service': 'service',
+        'sum_total': 'sum_total',
+        'status': 'status',
+        'owner': 'created_by__username',
+    }
+    if sort_col in allowed_sort:
+        field = allowed_sort[sort_col]
+        if field == 'status':
+            records = records.order_by(f'{order_prefix}status', '-created_at')
+        else:
+            records = records.order_by(f'{order_prefix}{field}', '-created_at')
+    else:
+        records = records.order_by('-date', '-created_at')
     contract_template_by_service = SERVICE_TO_CONTRACT_TEMPLATE
     contract_by_tkp = {
         c.tkp_id: c
@@ -1338,16 +1522,8 @@ def table_view(request):
             contract_template_by_tkp[r.pk] = tpl if tpl else True
     context = {
         'records': records,
-        'filters': {
-            'date_from': date_from,
-            'date_to': date_to,
-            'number': number,
-            'client': client,
-            'service': service,
-            'sum_min': sum_min,
-            'sum_max': sum_max,
-        },
-        'services_list': services,
+        'sort': sort_col or 'date',
+        'order': order,
         'contract_template_by_service': contract_template_by_service,
         'contract_template_by_tkp': contract_template_by_tkp,
         'contract_by_tkp': contract_by_tkp,
@@ -1364,6 +1540,10 @@ def contract_form_view(request, tkp_id):
         tkp = TKPRecord.objects.get(pk=tkp_id)
     except TKPRecord.DoesNotExist:
         messages.error(request, 'Запись ТКП не найдена.')
+        return redirect('proposals:table')
+
+    if tkp.service == UNIVERSAL_TKP_SERVICE:
+        messages.error(request, 'Для универсального ТКП формирование договора не предусмотрено.')
         return redirect('proposals:table')
 
     if tkp.service == 'Комплексное ТКП':
@@ -2008,7 +2188,12 @@ def kanban_view(request):
         col_key = positions.get(tkp.pk) or _kanban_computed_column(tkp, contract)
         if col_key not in columns:
             col_key = _kanban_computed_column(tkp, contract)
-        service_display = 'Комплексное' if tkp.service == 'Комплексное ТКП' else tkp.service
+        if tkp.service == 'Комплексное ТКП':
+            service_display = 'Комплексное'
+        elif tkp.service == UNIVERSAL_TKP_SERVICE:
+            service_display = 'Универсальное'
+        else:
+            service_display = tkp.service
         sum_val = tkp.sum_total or Decimal(0)
         card = {
             'tkp_id': tkp.pk,
@@ -2073,7 +2258,12 @@ def kanban_card_detail_view(request, tkp_id):
     except TKPRecord.DoesNotExist:
         raise Http404()
     contract = ContractRecord.objects.filter(tkp_id=tkp_id).select_related('counterparty').first()
-    service_display = 'Комплексное' if tkp.service == 'Комплексное ТКП' else tkp.service
+    if tkp.service == 'Комплексное ТКП':
+        service_display = 'Комплексное'
+    elif tkp.service == UNIVERSAL_TKP_SERVICE:
+        service_display = 'Универсальное'
+    else:
+        service_display = tkp.service
     custom_fields = list(
         KanbanCardField.objects.filter(user=request.user, tkp_id=tkp_id).order_by('order', 'pk')
     )
@@ -2371,6 +2561,48 @@ def contract_card_view(request, contract_id):
         'text': snapshot.get('text') or '',
     }
     return render(request, 'proposals/contract_card_content.html', ctx)
+
+
+@login_required
+@require_http_methods(['GET'])
+def tkp_card_view(request, pk):
+    """Карточка ТКП (фрагмент для модального окна): сохранённые реквизиты только для просмотра."""
+    try:
+        tkp = TKPRecord.objects.select_related('created_by').get(pk=pk)
+    except TKPRecord.DoesNotExist:
+        raise Http404()
+    date_display = tkp.date.strftime('%d.%m.%Y')
+    status_display = tkp.get_status_display() if tkp.status else 'Итоговый'
+    owner_display = ''
+    if tkp.created_by:
+        owner_display = tkp.created_by.get_full_name() or tkp.created_by.username
+    rows_display = []
+    if tkp.rows_json:
+        for i, r in enumerate(tkp.rows_json, 1):
+            comment = (r.get('comment') or '').replace(COMPLEX_COMMENT_LINE_BREAK_MARKER, '\n')
+            srok = (r.get('srok') or '').strip()
+            if srok:
+                comment = (comment.rstrip() + '\nСрок разработки - ' + srok) if comment else 'Срок разработки - ' + srok
+            unit_key = (r.get('unit') or 'm2')
+            rows_display.append({
+                'num': i,
+                'service_name': r.get('service_name', '') or '—',
+                'comment': comment,
+                'unit_display': UNIT_DISPLAY.get(unit_key, unit_key),
+                'quantity': r.get('quantity', ''),
+                'price_per_unit': _format_price(Decimal(str(r.get('price_per_unit') or 0))),
+                'total': _format_price(Decimal(str(r.get('total') or 0))),
+            })
+    ctx = {
+        'tkp': tkp,
+        'date_display': date_display,
+        'status_display': status_display,
+        'owner_display': owner_display,
+        'sum_display': _format_price(tkp.sum_total or 0),
+        'rows_display': rows_display,
+        'has_rows': bool(rows_display),
+    }
+    return render(request, 'proposals/tkp_card_content.html', ctx)
 
 
 @login_required

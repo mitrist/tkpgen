@@ -1,0 +1,203 @@
+{% extends "proposals/base.html" %}
+{% block title %}Формирование универсального ТКП{% endblock %}
+{% block container_extra_class %}container--wide{% endblock %}
+{% block content %}
+<h1>Формирование универсального ТКП</h1>
+<form method="post" action="{% url 'proposals:universal_form' %}" id="universal-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<ul class="errorlist">{{ form.non_field_errors }}</ul>{% endif %}
+    <div class="complex-form-header" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>{{ form.region.label_tag }}{{ form.region }}{% if form.region.help_text %}<p class="help">{{ form.region.help_text }}</p>{% endif %}</div>
+        <div>{{ form.date.label_tag }}{{ form.date }}</div>
+        <div>{{ form.client.label_tag }}{{ form.client }}</div>
+    </div>
+    <div style="margin-bottom: 1rem;">
+        <div>{{ form.room.label_tag }}{{ form.room }}{% if form.room.help_text %}<p class="help">{{ form.room.help_text }}</p>{% endif %}</div>
+        <div style="margin-top: 0.75rem;">{{ form.text1.label_tag }}{{ form.text1 }}{% if form.text1.help_text %}<p class="help">{{ form.text1.help_text }}</p>{% endif %}</div>
+    </div>
+    <p style="font-weight: 600; margin-bottom: 0.5rem;">Позиции ТКП</p>
+    <div class="complex-table-wrap" style="margin-bottom: 1rem;">
+        <table class="complex-table" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+            <colgroup>
+                <col style="width: 12rem;">
+                <col style="width: 30%;">
+                <col style="width: 11rem;">
+                <col style="width: 5.5rem;">
+                <col style="width: 5.5rem;">
+                <col style="width: 6.5rem;">
+                <col style="width: 6.5rem;">
+                <col style="width: 3rem;">
+            </colgroup>
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border);">
+                    <th style="text-align: left; padding: 0.5rem;">Компонент услуги</th>
+                    <th style="text-align: left; padding: 0.5rem;">Комментарий</th>
+                    <th style="text-align: left; padding: 0.5rem;">Срок разработки</th>
+                    <th style="text-align: left; padding: 0.5rem;">Ед. изм.</th>
+                    <th style="text-align: right; padding: 0.5rem;">Количество</th>
+                    <th style="text-align: right; padding: 0.5rem;">Цена за ед.</th>
+                    <th style="text-align: right; padding: 0.5rem;">Стоимость</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="rows-tbody">
+                <tr class="row-template" data-row="0">
+                    <td style="padding: 0.25rem;" data-label="Компонент услуги">
+                        <select class="input-service" style="margin: 0; width: 100%;">
+                            <option value="">— Выберите услугу —</option>
+                            {% for s in services %}
+                            <option value="{{ s.id }}" data-unit="{{ s.unit_type }}">{{ s.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td style="padding: 0.25rem;" data-label="Комментарий"><input type="text" class="input-comment" placeholder="Комментарий. Для переноса строки введите |" style="margin: 0; width: 100%;" title="Символ | (вертикальная черта) — перенос строки в ТКП"></td>
+                    <td style="padding: 0.25rem;" data-label="Срок разработки">
+                        <select class="input-srok" style="margin: 0; width: 100%;">
+                            {% for value, label in srok_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td style="padding: 0.25rem;" data-label="Ед. изм.">
+                        <select class="input-unit" style="margin: 0; width: 100%;">
+                            <option value="m2">м²</option>
+                            <option value="piece">шт</option>
+                        </select>
+                    </td>
+                    <td style="padding: 0.25rem;" data-label="Количество"><input type="number" class="input-qty" min="0" step="any" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
+                    <td style="padding: 0.25rem;" data-label="Цена за ед."><input type="number" class="input-price" min="0" step="0.01" value="0" style="margin: 0; width: 100%; text-align: right;"></td>
+                    <td style="padding: 0.5rem; text-align: right;" class="col-total" data-label="Стоимость">0</td>
+                    <td style="padding: 0.25rem;" data-label=""><button type="button" class="btn-remove btn-secondary" style="padding: 0.35rem 0.5rem; font-size: 0.875rem;">× Удалить</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p style="margin-bottom: 1rem;">
+        <button type="button" id="add-row" class="btn btn-secondary">Добавить строку</button>
+    </p>
+    <input type="hidden" name="rows_json" id="rows-json" value="[]">
+    <div class="actions">
+        <button type="submit">Далее — подтверждение</button>
+        <button type="submit" name="save_draft" value="1" class="btn btn-secondary" style="margin-left: 0.5rem;">Сохранить как черновик</button>
+    </div>
+</form>
+<script>
+(function() {
+    var tbody = document.getElementById('rows-tbody');
+    var hidden = document.getElementById('rows-json');
+    var regionSelect = document.getElementById('id_region');
+    var rowIndex = 1;
+    var regionPrices = {{ region_prices_json|safe }};
+    var serviceComments = {{ service_comments_json|safe }};
+
+    function parseNum(el) { var v = parseFloat(el.value); return isNaN(v) ? 0 : v; }
+    function updateTotal(row) {
+        var qty = parseNum(row.querySelector('.input-qty'));
+        var price = parseNum(row.querySelector('.input-price'));
+        var total = row.querySelector('.col-total');
+        total.textContent = (qty * price).toFixed(2);
+    }
+    function applyServiceAndPrice(row) {
+        var serviceSelect = row.querySelector('.input-service');
+        var unitSelect = row.querySelector('.input-unit');
+        var priceInput = row.querySelector('.input-price');
+        var commentInput = row.querySelector('.input-comment');
+        var opt = serviceSelect && serviceSelect.options[serviceSelect.selectedIndex];
+        if (!opt || !opt.value) {
+            if (unitSelect) unitSelect.value = 'm2';
+            if (priceInput) priceInput.value = '0';
+            if (commentInput) commentInput.value = '';
+            return;
+        }
+        var unit = opt.getAttribute('data-unit') || 'm2';
+        if (unitSelect) unitSelect.value = unit;
+        var regionId = regionSelect ? regionSelect.value : '';
+        if (regionId && regionPrices[regionId] && regionPrices[regionId][opt.value] !== undefined) {
+            priceInput.value = regionPrices[regionId][opt.value];
+        }
+        if (commentInput && serviceComments[opt.value] !== undefined) {
+            commentInput.value = serviceComments[opt.value] || '';
+        }
+        updateTotal(row);
+    }
+    function collectRows() {
+        var rows = [];
+        tbody.querySelectorAll('tr').forEach(function(tr) {
+            var serviceSelect = tr.querySelector('.input-service');
+            var serviceName = '';
+            if (serviceSelect && serviceSelect.selectedIndex >= 0) {
+                var opt = serviceSelect.options[serviceSelect.selectedIndex];
+                if (opt && opt.value) serviceName = opt.text || '';
+            }
+            var comment = (tr.querySelector('.input-comment') || {}).value || '';
+            var srokEl = tr.querySelector('.input-srok');
+            var srok = srokEl ? srokEl.value : '';
+            var unit = (tr.querySelector('.input-unit') || {}).value || 'm2';
+            var qty = parseNum(tr.querySelector('.input-qty'));
+            var price = parseNum(tr.querySelector('.input-price'));
+            rows.push({ service_name: serviceName, comment: comment, srok: srok, unit: unit, quantity: qty, price_per_unit: price });
+        });
+        return rows;
+    }
+    function syncHidden() { hidden.value = JSON.stringify(collectRows()); }
+
+    tbody.addEventListener('input', function(e) {
+        if (e.target.matches('.input-qty, .input-price')) {
+            updateTotal(e.target.closest('tr'));
+        }
+        if (e.target.matches('.input-qty, .input-price, .input-comment, .input-srok')) syncHidden();
+    });
+    tbody.addEventListener('change', function(e) {
+        if (e.target.matches('.input-unit, .input-srok')) { syncHidden(); return; }
+        if (e.target.matches('.input-service')) {
+            applyServiceAndPrice(e.target.closest('tr'));
+            syncHidden();
+        }
+    });
+
+    if (regionSelect) {
+        regionSelect.addEventListener('change', function() {
+            tbody.querySelectorAll('tr').forEach(function(tr) {
+                applyServiceAndPrice(tr);
+            });
+            syncHidden();
+        });
+    }
+
+    document.getElementById('add-row').addEventListener('click', function() {
+        var first = tbody.querySelector('tr');
+        var clone = first.cloneNode(true);
+        clone.classList.remove('row-template');
+        clone.setAttribute('data-row', rowIndex++);
+        var sv = clone.querySelector('.input-service');
+        if (sv) sv.value = '';
+        var uv = clone.querySelector('.input-unit');
+        if (uv) uv.value = 'm2';
+        var comm = clone.querySelector('.input-comment');
+        if (comm) comm.value = '';
+        var srokSel = clone.querySelector('.input-srok');
+        if (srokSel) srokSel.selectedIndex = 0;
+        clone.querySelector('.input-qty').value = '0';
+        clone.querySelector('.input-price').value = '0';
+        clone.querySelector('.col-total').textContent = '0';
+        tbody.appendChild(clone);
+        syncHidden();
+    });
+
+    tbody.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-remove')) {
+            var tr = e.target.closest('tr');
+            if (tbody.querySelectorAll('tr').length > 1) {
+                tr.remove();
+                syncHidden();
+            }
+        }
+    });
+
+    document.getElementById('universal-form').addEventListener('submit', function() {
+        syncHidden();
+    });
+    syncHidden();
+})();
+</script>
+{% endblock %}

@@ -129,6 +129,8 @@ python manage.py createsuperuser
    ```
    Скопируйте вывод в значение `SECRET_KEY=`.
 
+   Чтобы база SQLite и каталог с PDF/DOCX хранились **вне каталога с кодом** (удобно при деплоях), добавьте `SQLITE_DB_PATH` и `TKP_OUTPUT_DIR` — см. раздел **«Постоянное хранилище: реестр ТКП/договоров и файлы PDF/DOCX»** ниже.
+
 5. Если используется ТКП через Telegram, добавьте в тот же `.env`:
    ```env
    TELEGRAM_BOT_TOKEN=токен_от_BotFather
@@ -473,6 +475,56 @@ sudo certbot --nginx -d nacpro-web-service.ru -d www.nacpro-web-service.ru
 ```bash
 sudo certbot renew --dry-run
 ```
+
+---
+
+## Постоянное хранилище: реестр ТКП/договоров и файлы PDF/DOCX
+
+Реестр документов хранится в **SQLite**; готовые **PDF и DOCX** — в каталоге вывода. По умолчанию оба пути лежат **внутри каталога проекта** (`db.sqlite3` и `TKP_output/`). Они в `.gitignore` и **не перезаписываются** обычным `git pull`.
+
+История теряется, если при деплое **удаляют весь каталог проекта**, делают **новый `git clone`**, пересоздают **контейнер без тома** или запускают приложение **из другой папки**, где нет старой базы и файлов.
+
+### Рекомендация на production-сервере
+
+1. Один раз создать постоянный каталог (пример):
+
+   ```bash
+   sudo mkdir -p /var/lib/tkp-app
+   sudo chown mitrist12:mitrist12 /var/lib/tkp-app
+   ```
+
+2. В `.env` приложения (тот же файл, что подключает systemd через `EnvironmentFile`) задать **абсолютные пути**:
+
+   ```
+   SQLITE_DB_PATH=/var/lib/tkp-app/db.sqlite3
+   TKP_OUTPUT_DIR=/var/lib/tkp-app/TKP_output
+   ```
+
+3. Перезапустить сервис: `sudo systemctl restart tkp_generator`. При первом запуске Django создаст каталоги при необходимости. Если база по новому пути пуста, выполните миграции: `python manage.py migrate`.
+
+4. Если база и файлы уже были в корне проекта, **перед переключением путей** скопируйте их:
+
+   ```bash
+   cp /home/mitrist12/tkp_generator/db.sqlite3 /var/lib/tkp-app/db.sqlite3
+   cp -a /home/mitrist12/tkp_generator/TKP_output/. /var/lib/tkp-app/TKP_output/
+   ```
+
+5. Регулярно делайте **резервные копии** `/var/lib/tkp-app/` (или отдельно файла БД и каталога с docx/pdf).
+
+### Перенос в подкаталог `data/` внутри проекта (на сервере Linux)
+
+Если в `.env` задано `SQLITE_DB_PATH=data/db.sqlite3` и `TKP_OUTPUT_DIR=data/TKP_output`, а раньше база и файлы лежали в **корне** репозитория, перенесите их командами **bash** (не PowerShell: на VM нет `New-Item` и `Copy-Item`):
+
+```bash
+cd /home/mitrist12/tkp_generator
+mkdir -p data
+test -f db.sqlite3 && cp db.sqlite3 data/db.sqlite3
+test -d TKP_output && mkdir -p data/TKP_output && cp -a TKP_output/. data/TKP_output/
+```
+
+Путь в Linux использует **слэш** `/`, не обратный `\`. После копирования перезапустите сервис: `sudo systemctl restart tkp_generator`.
+
+Команда `git pull` и `./deploy.sh` обновляют **только код** из репозитория; файлы в `SQLITE_DB_PATH` и `TKP_OUTPUT_DIR` при корректной настройке **не затрагиваются**. Не используйте `git clean -fdx` в каталоге проекта без понимания последствий для неотслеживаемых файлов.
 
 ---
 

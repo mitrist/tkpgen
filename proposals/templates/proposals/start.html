@@ -117,7 +117,7 @@
                         <td>{{ r.date|date:"d.m.Y" }}</td>
                         <td>
                             {% if r.status == 'draft' %}
-                            <a href="{% if r.service == 'Комплексное ТКП' %}{% url 'proposals:complex_form' %}?draft_id={{ r.pk }}{% else %}{% url 'proposals:form' %}?draft_id={{ r.pk }}{% endif %}">{{ r.number }}</a>
+                            <a href="{% if r.service == 'Комплексное ТКП' %}{% url 'proposals:complex_form' %}?draft_id={{ r.pk }}{% elif r.service == 'Универсальное ТКП' %}{% url 'proposals:universal_form' %}?draft_id={{ r.pk }}{% else %}{% url 'proposals:form' %}?draft_id={{ r.pk }}{% endif %}">{{ r.number }}</a>
                             {% else %}
                             <a href="{% url 'proposals:table' %}">{{ r.number }}</a>
                             {% endif %}

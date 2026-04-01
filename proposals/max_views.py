@@ -43,6 +43,7 @@ from .views import (
     CONTRACT_SPEC_TABLE_PLACEHOLDER,
     CONTRACT_TEMPLATES_SUBDIR,
     SERVICE_TO_CONTRACT_TEMPLATE,
+    UNIVERSAL_TKP_SERVICE,
     _build_complex_table_document,
     _complex_rows_json_to_ctx,
     _convert_docx_to_pdf,
@@ -461,6 +462,9 @@ def max_contract_submit_view(request):
         tkp = TKPRecord.objects.get(pk=int(tkp_id))
     except Exception:
         return JsonResponse({"error": "TKP not found"}, status=404)
+
+    if tkp.service == UNIVERSAL_TKP_SERVICE:
+        return JsonResponse({"error": "Для универсального ТКП договор не формируется"}, status=400)
 
     is_complex_contract = tkp.service == "Комплексное ТКП"
     if is_complex_contract:
