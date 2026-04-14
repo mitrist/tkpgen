@@ -598,8 +598,8 @@ def confirm_view(request):
         except Exception as e:
             messages.error(request, f'Ошибка генерации: {e}')
             return redirect('proposals:confirm')
-        if base_name:
-            _save_tkp_record(data, user=request.user)
+            if base_name:
+                _save_tkp_record(data, user=request.user, force_number=base_name)
             draft_id = request.session.pop('tkp_draft_id', None)
             if draft_id:
                 TKPRecord.objects.filter(pk=draft_id).delete()
@@ -962,7 +962,7 @@ def complex_confirm_view(request):
                 return redirect('proposals:table')
             base_name = _generate_complex_and_save_files(data)
             if base_name:
-                _save_complex_tkp_record(data, user=request.user)
+                _save_complex_tkp_record(data, user=request.user, force_number=base_name)
                 draft_id = request.session.pop('complex_draft_id', None)
                 if draft_id:
                     TKPRecord.objects.filter(pk=draft_id).delete()
@@ -1176,7 +1176,12 @@ def universal_confirm_view(request):
                 return redirect('proposals:table')
             base_name = _generate_complex_and_save_files(data)
             if base_name:
-                _save_complex_tkp_record(data, user=request.user, service_name=UNIVERSAL_TKP_SERVICE)
+                _save_complex_tkp_record(
+                    data,
+                    user=request.user,
+                    service_name=UNIVERSAL_TKP_SERVICE,
+                    force_number=base_name,
+                )
                 draft_id = request.session.pop('universal_draft_id', None)
                 if draft_id:
                     TKPRecord.objects.filter(pk=draft_id).delete()
@@ -1441,12 +1446,14 @@ def _serialize_complex_rows_for_storage(rows):
     ]
 
 
-def _save_complex_tkp_record(data, status=None, user=None, service_name='Комплексное ТКП'):
+def _save_complex_tkp_record(data, status=None, user=None, service_name='Комплексное ТКП', force_number=None):
     """Сохранение записи о сформированном комплексном или универсальном ТКП (status по умолчанию — итоговый)."""
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
     rows = data.get('rows') or []
     total_sum = sum(Decimal(str(r['total'])) for r in rows)
-    if status == TKPRecord.STATUS_DRAFT:
+    if force_number:
+        number = force_number
+    elif status == TKPRecord.STATUS_DRAFT:
         seq = _get_next_draft_seq_for_date(date_obj)
         number = _generate_draft_number(date_obj, seq)
     else:
@@ -2954,11 +2961,13 @@ def _generate_draft_number(date_obj, seq):
     return f'Черновик_{date_obj:%d%m%Y}_{seq}'
 
 
-def _save_tkp_record(data, status=None, user=None):
+def _save_tkp_record(data, status=None, user=None, force_number=None):
     """Сохранение записи о сформированном ТКП (status по умолчанию — итоговый)."""
     from datetime import datetime
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
-    if status == TKPRecord.STATUS_DRAFT:
+    if force_number:
+        number = force_number
+    elif status == TKPRecord.STATUS_DRAFT:
         seq = _get_next_draft_seq_for_date(date_obj)
         number = _generate_draft_number(date_obj, seq)
     else:
