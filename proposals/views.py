@@ -72,6 +72,7 @@ SERVICE_TO_CONTRACT_TEMPLATE = {
 
 # Плейсхолдер в шаблонах договоров 08 и 05 — сюда вставляется таблица спецификации (как в комплексном ТКП)
 CONTRACT_SPEC_TABLE_PLACEHOLDER = '___CONTRACT_SPEC_TABLE___'
+BASE_NAME_ALLOWED_RE = r'^[a-zA-Z0-9_+\-.\u0400-\u04FF\u00AB\u00BB\u2116]+$'
 
 
 # Шаблоны комплексных договоров (подпапка contracts_templates)
@@ -302,7 +303,10 @@ def _sanitize_filename(name):
         return 'client'
     s = name.strip()
     s = re.sub(r'[\s]+', '_', s)
+    # Точка в наименовании контрагента ломает часть сценариев скачивания у некоторых клиентов.
+    s = s.replace('.', '_')
     s = re.sub(r'[\\/:*?"<>|]', '', s)
+    s = re.sub(r'[^a-zA-Z0-9_+\-.\u0400-\u04FF\u00AB\u00BB\u2116]', '', s)
     return s[:100] if s else 'client'
 
 
@@ -653,7 +657,7 @@ def download_file_view(request, file_type):
     if not base_name or file_type not in ('pdf', 'docx'):
         raise Http404()
     # Допускаем буквы (латиница, кириллица), цифры, _, -, +, « », № (+ встречается в sanitize имени клиента)
-    if not re.match(r'^[a-zA-Z0-9_+\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
+    if not re.match(BASE_NAME_ALLOWED_RE, base_name):
         raise Http404()
     ext = 'pdf' if file_type == 'pdf' else 'docx'
     path = _ensure_tkp_output_path(base_name, ext)
@@ -713,7 +717,7 @@ def _ensure_tkp_output_path(base_name, ext):
 
 def _validate_tkp_base_name(base_name):
     """Проверка base_name и путь к PDF в TKP_output. Возвращает (path, error)."""
-    if not base_name or not re.match(r'^[a-zA-Z0-9_+\-\u0400-\u04FF\u00AB\u00BB\u2116]+$', base_name):
+    if not base_name or not re.match(BASE_NAME_ALLOWED_RE, base_name):
         return None, 'Недопустимое имя файла'
     path = _ensure_tkp_output_path(base_name, 'pdf')
     if not path:

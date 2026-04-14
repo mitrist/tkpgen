@@ -57,6 +57,7 @@ from .views import (
     _normalize_ris_text,
     _ensure_tkp_output_path,
     _save_complex_tkp_record,
+    BASE_NAME_ALLOWED_RE,
     contract_template_extras_for_ctx,
     get_contract_template_for_complex_tkp,
 )
@@ -574,7 +575,7 @@ def max_download_view(request, file_type):
     base_name = request.GET.get("f", "").strip()
     if not base_name or file_type not in ("pdf", "docx"):
         raise Http404()
-    if not re.match(r"^[a-zA-Z0-9_+\-\u0400-\u04FF\u00AB\u00BB\u2116]+$", base_name):
+    if not re.match(BASE_NAME_ALLOWED_RE, base_name):
         raise Http404()
     ext = "pdf" if file_type == "pdf" else "docx"
     path = _ensure_tkp_output_path(base_name, ext)
