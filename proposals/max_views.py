@@ -55,6 +55,7 @@ from .views import (
     _insert_table_into_docx,
     _load_ris_text_file,
     _normalize_ris_text,
+    _ensure_tkp_output_path,
     _save_complex_tkp_record,
     contract_template_extras_for_ctx,
     get_contract_template_for_complex_tkp,
@@ -273,7 +274,10 @@ def max_submit_complex_tkp_view(request):
         "text1": (body.get("text1") or "").strip(),
         "rows": rows_serializable,
     }
-    base_name = _generate_complex_and_save_files(data)
+    try:
+        base_name = _generate_complex_and_save_files(data)
+    except Exception as exc:
+        return JsonResponse({"error": f"Complex TKP generation failed: {exc}"}, status=500)
     if not base_name:
         return JsonResponse({"error": "Complex TKP generation failed"}, status=500)
     _save_complex_tkp_record(data, user=None)
@@ -572,9 +576,8 @@ def max_download_view(request, file_type):
         raise Http404()
     if not re.match(r"^[a-zA-Z0-9_+\-\u0400-\u04FF\u00AB\u00BB\u2116]+$", base_name):
         raise Http404()
-    out_dir = Path(getattr(settings, "TKP_OUTPUT_DIR", settings.BASE_DIR / "TKP_output"))
     ext = "pdf" if file_type == "pdf" else "docx"
-    path = out_dir / f"{base_name}.{ext}"
-    if not path.exists():
+    path = _ensure_tkp_output_path(base_name, ext)
+    if not path:
         raise Http404()
     return FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
