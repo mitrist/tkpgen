@@ -75,6 +75,43 @@ CONTRACT_SPEC_TABLE_PLACEHOLDER = '___CONTRACT_SPEC_TABLE___'
 BASE_NAME_ALLOWED_RE = r'^[a-zA-Z0-9_+\-.\u0400-\u04FF\u00AB\u00BB\u2116]+$'
 
 
+def _templates_docx_dir():
+    return Path(getattr(settings, 'TEMPLATES_DOCX_DIR', settings.BASE_DIR / 'templates_docx'))
+
+
+def _resolve_docx_path(directory: Path, *relative_parts: str):
+    """
+    Найти файл шаблона: точное имя или без учёта регистра (важно для Linux).
+    relative_parts: ('Шаблон 1 ДП.docx',) или ('contracts_templates', '01_Договор_ДП.docx').
+    """
+    directory = Path(directory)
+    if not relative_parts:
+        return None
+    *subdirs, filename = relative_parts
+    base = directory
+    for part in subdirs:
+        base = base / part
+    direct = base / filename
+    if direct.is_file():
+        return direct
+    if not base.is_dir():
+        return None
+    target = filename.casefold()
+    for entry in base.iterdir():
+        if entry.is_file() and entry.name.casefold() == target:
+            return entry
+    return None
+
+
+def _docx_template_not_found_message(directory: Path, *relative_parts: str, hint: str = '') -> str:
+    rel = '/'.join(relative_parts)
+    extra = f' {hint}' if hint else ''
+    return (
+        f'Шаблон не найден: {rel} в каталоге {directory}.{extra} '
+        'Проверьте имя файла на диске и в справочнике услуг (python manage.py init_services).'
+    )
+
+
 # Шаблоны комплексных договоров (подпапка contracts_templates)
 COMPLEX_CONTRACT_TEMPLATE_03 = '03_Договор_Навигация.docx'
 COMPLEX_CONTRACT_TEMPLATE_05 = '05_Договор_Контент_Навигация.docx'
@@ -602,8 +639,8 @@ def confirm_view(request):
         except Exception as e:
             messages.error(request, f'Ошибка генерации: {e}')
             return redirect('proposals:confirm')
-            if base_name:
-                _save_tkp_record(data, user=request.user, force_number=base_name)
+        if base_name:
+            _save_tkp_record(data, user=request.user, force_number=base_name)
             draft_id = request.session.pop('tkp_draft_id', None)
             if draft_id:
                 TKPRecord.objects.filter(pk=draft_id).delete()
@@ -611,7 +648,7 @@ def confirm_view(request):
             return redirect('proposals:download_success')
         messages.error(
             request,
-            'Ошибка генерации. Проверьте, что шаблоны .docx есть в папке templates_docx/'
+            'Ошибка генерации: не удалось сохранить файлы ТКП. Повторите попытку или обратитесь к администратору.'
         )
         return redirect('proposals:confirm')
 
@@ -972,7 +1009,10 @@ def complex_confirm_view(request):
                     TKPRecord.objects.filter(pk=draft_id).delete()
                 request.session['tkp_download_base'] = base_name
                 return redirect('proposals:download_success')
-            messages.error(request, 'Ошибка генерации. Проверьте шаблон в templates_docx/')
+            messages.error(
+                request,
+                _docx_template_not_found_message(_templates_docx_dir(), COMPLEX_TEMPLATE_NAME),
+            )
             return redirect('proposals:complex_confirm')
         except Exception as e:
             messages.error(request, f'Ошибка генерации: {e}')
@@ -1191,7 +1231,10 @@ def universal_confirm_view(request):
                     TKPRecord.objects.filter(pk=draft_id).delete()
                 request.session['tkp_download_base'] = base_name
                 return redirect('proposals:download_success')
-            messages.error(request, 'Ошибка генерации. Проверьте шаблон в templates_docx/')
+            messages.error(
+                request,
+                _docx_template_not_found_message(_templates_docx_dir(), COMPLEX_TEMPLATE_NAME),
+            )
             return redirect('proposals:universal_confirm')
         except Exception as e:
             messages.error(request, f'Ошибка генерации: {e}')
@@ -1371,9 +1414,9 @@ def _insert_table_into_docx(docx_path, table_doc, placeholder=None):
 
 def _generate_complex_and_save_files(data):
     """Генерация docx по шаблону комплексного ТКП, конвертация в PDF, сохранение. Возвращает base_name."""
-    templates_dir = getattr(settings, 'TEMPLATES_DOCX_DIR', Path(settings.BASE_DIR) / 'templates_docx')
-    template_path = templates_dir / COMPLEX_TEMPLATE_NAME
-    if not template_path.exists():
+    templates_dir = _templates_docx_dir()
+    template_path = _resolve_docx_path(templates_dir, COMPLEX_TEMPLATE_NAME)
+    if not template_path:
         return None
 
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()
@@ -1628,7 +1671,7 @@ def contract_form_view(request, tkp_id):
             return redirect('proposals:table')
         is_complex_contract = False
 
-    templates_dir = getattr(settings, 'TEMPLATES_DOCX_DIR', Path(settings.BASE_DIR) / 'templates_docx')
+    templates_dir = _templates_docx_dir()
 
     # Предзаполнение: из черновика (GET contract_draft_id) или из ТКП и карточки контрагента
     contract_draft_id = None
@@ -1707,9 +1750,16 @@ def contract_form_view(request, tkp_id):
     # Для комплексного ТКП шаблон берём из выбора пользователя (по умолчанию 03)
     if is_complex_contract:
         contract_template_file = initial.get('complex_contract_type') or COMPLEX_CONTRACT_TEMPLATE_03
-    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
-    if not template_path.exists():
-        messages.error(request, f'Шаблон договора не найден: {contract_template_file}')
+    template_path = _resolve_docx_path(
+        templates_dir, CONTRACT_TEMPLATES_SUBDIR, contract_template_file
+    )
+    if not template_path:
+        messages.error(
+            request,
+            _docx_template_not_found_message(
+                templates_dir, CONTRACT_TEMPLATES_SUBDIR, contract_template_file
+            ),
+        )
         return redirect('proposals:table')
 
     if request.method == 'POST':
@@ -1724,7 +1774,17 @@ def contract_form_view(request, tkp_id):
                 contract_template_file = ct
             else:
                 contract_template_file = COMPLEX_CONTRACT_TEMPLATE_03
-            template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
+            template_path = _resolve_docx_path(
+                templates_dir, CONTRACT_TEMPLATES_SUBDIR, contract_template_file
+            )
+            if not template_path:
+                messages.error(
+                    request,
+                    _docx_template_not_found_message(
+                        templates_dir, CONTRACT_TEMPLATES_SUBDIR, contract_template_file
+                    ),
+                )
+                return redirect('proposals:contract_form', tkp_id=tkp_id)
         save_draft = request.POST.get('save_draft')
         if save_draft:
             draft_errors = []
@@ -1812,7 +1872,9 @@ def contract_form_view(request, tkp_id):
                 cd = form.cleaned_data
                 if is_complex_contract:
                     contract_template_file = cd['complex_contract_type']
-                    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
+                    template_path = _resolve_docx_path(
+                        templates_dir, CONTRACT_TEMPLATES_SUBDIR, contract_template_file
+                    )
                 cp = cd['counterparty']
                 date_obj = cd['date']
                 price_val = cd['price']
@@ -1898,7 +1960,9 @@ def contract_form_view(request, tkp_id):
                 cd = form.cleaned_data
                 if is_complex_contract:
                     contract_template_file = cd['complex_contract_type']
-                    template_path = templates_dir / CONTRACT_TEMPLATES_SUBDIR / contract_template_file
+                    template_path = _resolve_docx_path(
+                        templates_dir, CONTRACT_TEMPLATES_SUBDIR, contract_template_file
+                    )
                 cp = cd['counterparty']
                 date_obj = cd['date']
                 price_val = cd['price']
@@ -2108,9 +2172,12 @@ def contract_save_from_editor_view(request):
     file_base = f'Дог_{contract_number}'
     docx_path = out_dir / f'{file_base}.docx'
 
-    templates_dir = Path(getattr(settings, 'TEMPLATES_DOCX_DIR', settings.BASE_DIR / 'templates_docx'))
+    templates_dir = _templates_docx_dir()
     template_filename = request.session.get(SESSION_KEY_EDITOR_TEMPLATE_FILE)
-    reference_doc = (templates_dir / CONTRACT_TEMPLATES_SUBDIR / template_filename) if template_filename else None
+    reference_doc = (
+        _resolve_docx_path(templates_dir, CONTRACT_TEMPLATES_SUBDIR, template_filename)
+        if template_filename else None
+    )
     extra_args = []
     if reference_doc and reference_doc.exists():
         extra_args.append('--reference-doc=' + str(reference_doc))
@@ -2993,16 +3060,29 @@ def _save_tkp_record(data, status=None, user=None, force_number=None):
 
 def _generate_and_save_files(data):
     """Генерация docx, конвертация в PDF, сохранение обоих в TKP_output. Возвращает base_name файлов."""
+    service_id = data.get('service_id')
+    if not service_id:
+        raise ValueError(
+            'Не указана услуга. Вернитесь к форме ТКП и заполните её заново.'
+        )
     try:
-        service = Service.objects.get(pk=data['service_id'])
+        service = Service.objects.get(pk=service_id)
     except Service.DoesNotExist:
-        return None
+        raise ValueError(
+            f'Услуга с id={service_id} не найдена в справочнике. '
+            'Заполните форму заново или выполните: python manage.py init_services'
+        ) from None
 
-    templates_dir = getattr(settings, 'TEMPLATES_DOCX_DIR', Path(settings.BASE_DIR) / 'templates_docx')
-    template_path = templates_dir / service.template_file
-
-    if not template_path.exists():
-        return None
+    templates_dir = _templates_docx_dir()
+    template_path = _resolve_docx_path(templates_dir, service.template_file)
+    if not template_path:
+        raise FileNotFoundError(
+            _docx_template_not_found_message(
+                templates_dir,
+                service.template_file,
+                hint=f'Услуга «{service.name}», файл в БД: {service.template_file!r}.',
+            )
+        )
 
     from datetime import datetime
     date_obj = datetime.strptime(data['date'], '%Y-%m-%d').date()

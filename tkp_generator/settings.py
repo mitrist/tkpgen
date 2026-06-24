@@ -105,8 +105,8 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
-# Папка с шаблонами .docx
-TEMPLATES_DOCX_DIR = BASE_DIR / 'templates_docx'
+# Папка с шаблонами .docx (переопределяется TEMPLATES_DOCX_DIR в .env)
+TEMPLATES_DOCX_DIR = _path_from_env('TEMPLATES_DOCX_DIR', BASE_DIR / 'templates_docx')
 # Папка для сформированных PDF и DOCX (ТКП и договоры); переопределяется TKP_OUTPUT_DIR в .env
 TKP_OUTPUT_DIR = _path_from_env('TKP_OUTPUT_DIR', BASE_DIR / 'TKP_output')
 
